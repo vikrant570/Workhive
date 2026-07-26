@@ -93,8 +93,7 @@ const ChatList: React.FC<Props> = ({ chats, setChatID, setChatName, setChatOpen,
             onClick={() => {
               setChatID(chat._id);
               setChatName(chat?.groupName || chatNaming(chat?.participants));
-              setChatOpen(false);
-              setChatOpen(true);
+              setChatOpen((prev) => chat._id === chatID && prev == true ? false : true)
             }}
             key={i}
           >

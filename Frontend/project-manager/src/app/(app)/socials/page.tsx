@@ -111,9 +111,9 @@ const Socials = () => {
         }
     }
 
-    if (error !== "") return (
-        <FullContentError page="Socials" error={error} />
-    )
+    if (error !== "") {
+        return <FullContentError page="Socials" error={error} />
+    }
 
     return (
         <div className="max-w-screen min-h-screen bg-ui-main p-8 ml-55 text-texts-primary font-sans" onClick={(e) => handleglobalClick(e)}>
@@ -198,7 +198,7 @@ const Socials = () => {
                         )
                             :
                             <>
-                                <div className="w-20 h-20 bg-ui-main rounded-full flex items-center justify-center mb-5 shadow-sm border border-ui-tertiary/5">
+                                <div className="w-20 h-20 bg-ui-main rounded-full flex items-center justify-center mb-5 shadow-2xl shadow-buttons/20 border border-ui-tertiary/5">
                                     <LuUserPlus size={36} className="text-buttons opacity-90" />
                                 </div>
 

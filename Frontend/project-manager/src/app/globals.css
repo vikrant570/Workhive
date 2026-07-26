@@ -176,12 +176,3 @@ form label {
     transform: scale(1) translateY(0);
   }
 }
-
-/* ---- Chat Background Image ----  */
-#chat-background {
-  background-image: linear-gradient(rgba(0, 0, 0, 0.4), rgba(0, 0, 0, 0.4)), url("/images/Chat_Background.png");
-  background-repeat: no-repeat;
-  background-position: center center;
-  background-attachment: fixed;
-  background-size: cover;
-}

@@ -209,9 +209,9 @@ const ChatInterface: React.FC<ChatProps> = ({ chatID, chatName, setChatOpen, set
   }
 
   return (
-    <div className="flex flex-col h-screen text-texts-primary font-sans w-3xl mx-0 shadow-2xl border-r border-ui-tertiary/40" id="chat-background">
+    <div className="bg-black/25 flex flex-col h-screen text-texts-primary font-sans w-3xl mx-0 shadow-2xl border-r border-ui-tertiary/40">
       {/* Header */}
-      <header className="flex items-center justify-between px-4 py-3 bg-ui-secondary sticky top-0 z-10">
+      <header className="flex items-center justify-between px-4 py-3 bg-ui-secondary shadow-xl shadow-black/30 sticky top-0 z-10">
         <div className="flex items-center gap-3">
           <div className="relative">
             <div className="w-10 h-10 rounded-full bg-buttons/70 flex items-center justify-center font-bold text-white text-sm">
@@ -244,9 +244,7 @@ const ChatInterface: React.FC<ChatProps> = ({ chatID, chatName, setChatOpen, set
         <div ref={messagesTopRef} />
 
         <Suspense fallback={
-          <div className="bg-transparent h-1/2 w-auto m-0 text-center">
-            <h1 className="mt-30 m-auto text-red-400">{error || "Something Went Wrong!\nPlease Try Again Later."}</h1>
-          </div>
+          <CgSpinner size={18} className="animate-spin mx-auto mt-30" />
         }>
 
           {

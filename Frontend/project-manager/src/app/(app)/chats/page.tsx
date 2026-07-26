@@ -1,5 +1,5 @@
 "use client";
-import { Suspense, useEffect, useState } from "react";
+import { Suspense, useEffect, useRef, useState } from "react";
 
 //ICONS
 import { LuMessagesSquare, LuLock, LuSearch } from "react-icons/lu";
@@ -38,7 +38,35 @@ interface Msg {
   createdAt: string
 }
 
-const Chats = () => {
+const EmptyChatPlaceholder = ({ fallback }: { fallback: "fullPage" | "onlyMessages" }) => {
+  return (
+    <div className={`bg-ui-secondary border-r border-white/30 h-screen ${fallback === "fullPage" ? "w-full ml-55" : "w-3xl"} flex flex-col items-center justify-center relative`}>
+      {/* Center Content */}
+      <div className="flex flex-col items-center text-center max-w-sm px-6">
+        <div className="w-24 h-24 bg-ui-main rounded-full flex items-center justify-center mb-6 shadow-lg shadow-buttons/10">
+          <LuMessagesSquare size={44} className="text-buttons opacity-80" />
+        </div>
+
+        <h2 className="text-xl font-semibold text-texts-primary mb-2">
+          WorkHive Workspace
+        </h2>
+
+        <p className="text-texts-secondary text-sm leading-relaxed">
+          Select a conversation from the sidebar to start collaborating, or create a new project chat.
+        </p>
+      </div>
+
+      {/* Bottom Security Note */}
+      <div className="absolute bottom-8 flex items-center gap-1.5 text-texts-secondary/50 text-xs font-medium">
+        <LuLock size={12} />
+        <span>Secure, real-time collaboration</span>
+      </div>
+
+    </div>
+  );
+}
+
+const ChatsContent = () => {
   //will get from the cookie or compare using Oid
   const [chats, setChats] = useState<Array<any>>([]);
   const [chatID, setChatID] = useState<string>("");
@@ -49,16 +77,21 @@ const Chats = () => {
   const { showToastMsg } = useToastMsgContext();
 
   // For Refresh Sorting Of Chats on sending/receving message;
-  const [interaction, setInteraction] = useState<Msg | null>(null);
   // Interaction = Any Message Sent Or Received
+  const [interaction, setInteraction] = useState<Msg | null>(null);
 
-  // Previous Path
+  // Previous Path - Navigation Purpose
   const prevPath = useSearchParams().get("from");
   const connectionId = useSearchParams().get("c_id");
 
   const [chatOpen, setChatOpen] = useState<boolean>(false);
+  const [error, setError] = useState<string | null>(null);
 
-  const [error, setError] = useState<string>("");
+  const handleErrorLocally = (err: any) => {
+    const errToShow = (handleError(err, "axios") as string);
+    showToastMsg({ text: errToShow, type: 'error' });
+    setError(errToShow);
+  }
 
   // --- If User Arriving From Any Indirect Route --- 
   const OpenChat = (chat: Chat) => {
@@ -80,11 +113,8 @@ const Chats = () => {
         OpenChat(newChat);
       }
       catch (err) {
-        const errToShow = (handleError(err, "axios") as string);
-        showToastMsg({ text: errToShow, type: 'error' });
-        setError(errToShow);
+        handleErrorLocally(err);
       }
-
     } else if (chat) {
       // Case 2 : User Has Existing Chat With This Connection
       OpenChat(chat);
@@ -101,13 +131,12 @@ const Chats = () => {
         setChats(chatList.chats);
       }
       catch (err) {
-        const errToShow = handleError(err, "axios") as string;
-        setError(errToShow);
-        showToastMsg({ text: errToShow, type: 'error' })
+        handleErrorLocally(err);
       }
     }
     fetchChatList();
-    // Later On Upgrading For Group Chats To.
+
+    // Later On Upgrading For Group Chats Too 054
     if (connectionId && chats) {
       IndirectChatOpen()
     }
@@ -115,40 +144,11 @@ const Chats = () => {
 
   // Listenin to msg and providing to components on arrival
   useEffect(() => {
-    if (msg?.text !== "") setInteraction(msg);
-  }, [msg])
+    if (msg?._id !== "") setInteraction(msg);
+  }, [msg]);
 
-  if (error !== "") {
+  if (error) {
     return <FullContentError page={"Chats"} error={error} />
-  }
-
-  const EmptyChatPlaceholder = () => {
-    return (
-      <div className="bg-ui-secondary border-r border-white/30 h-screen w-3xl flex flex-col items-center justify-center relative">
-
-        {/* Center Content */}
-        <div className="flex flex-col items-center text-center max-w-sm px-6">
-          <div className="w-24 h-24 bg-ui-main rounded-full flex items-center justify-center mb-6 shadow-lg shadow-buttons/10">
-            <LuMessagesSquare size={44} className="text-buttons opacity-80" />
-          </div>
-
-          <h2 className="text-xl font-semibold text-texts-primary mb-2">
-            WorkHive Workspace
-          </h2>
-
-          <p className="text-texts-secondary text-sm leading-relaxed">
-            Select a conversation from the sidebar to start collaborating, or create a new project chat.
-          </p>
-        </div>
-
-        {/* Bottom Security Note */}
-        <div className="absolute bottom-8 flex items-center gap-1.5 text-texts-secondary/50 text-xs font-medium">
-          <LuLock size={12} />
-          <span>Secure, real-time collaboration</span>
-        </div>
-
-      </div>
-    );
   }
 
   return (
@@ -156,7 +156,7 @@ const Chats = () => {
       {/* LEFT COLUMN - Chat List */}
       <div className="w-xl overflow-hidden">
         {/* 054 - Back Button */}
-        <div className="bg-ui-secondary shadow-lg p-4 h-screen flex flex-col border-x border-white/30">
+        <div className="bg-ui-secondary shadow-lg p-4 h-screen flex flex-col border-x border-ui-tertiary/20">
           <h2 className="text-xl font-semibold mb-4 border-b border-ui-tertiary/20 pb-2">
             Recent Chats
           </h2>
@@ -183,11 +183,18 @@ const Chats = () => {
 
       {/* 054 - May require to pass the full chat later on */}
       {
-        chatOpen && chatID && <ChatInterface chatID={chatID} chatName={chatName} setChatOpen={setChatOpen} setInteraction={setInteraction} interaction={interaction} />
-        || <EmptyChatPlaceholder />
+        chatID !== "" && chatOpen ?
+          <ChatInterface chatID={chatID} chatName={chatName} setChatOpen={setChatOpen} setInteraction={setInteraction} interaction={interaction} />
+          : <EmptyChatPlaceholder fallback={"onlyMessages"} />
       }
     </div>
   );
 };
 
-export default Chats;
+export default function Chats() {
+  return (
+    <Suspense fallback={<EmptyChatPlaceholder fallback={"fullPage"} />}>
+      <ChatsContent />
+    </Suspense>
+  )
+};
