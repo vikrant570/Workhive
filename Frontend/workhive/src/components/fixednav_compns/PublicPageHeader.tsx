@@ -23,7 +23,6 @@ export default async function PublicPageHeader() {
         try {
             if (!isLoggedIn) throw new Error("User not logged In!");
             const response: NextApiRes = await fetchUserProfile_server("0", "1");
-            if (!response.success) throw new Error("Failed to fetch data !");
 
             const { profileData } = response;
 
