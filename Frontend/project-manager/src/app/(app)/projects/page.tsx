@@ -1,5 +1,5 @@
 import { fetchProjectsList_server } from "@/lib/fetchData.server";
-import ProjectsList from "../../../components/ProjectsList";
+import ProjectsList from "@/app/(app)/projects/components/ProjectsList";
 import { Suspense } from "react";
 import { CgSpinner } from "react-icons/cg";
 

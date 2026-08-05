@@ -1,13 +1,13 @@
-import Users from "../models/auth/usersModel";
+import Users from "../models/auth/usersModel.js";
 import express from "express";
 import bcrypt from "bcrypt";
 import jwt from "jsonwebtoken";
-import { sendOtp, sendFinalMail } from "../utils/mailer";
-import OTP from "../models/auth/otpsModel";
-import routeHandler from "../middlewares/globalErrWrap";
-import otpCrossCheck from "../utils/otpCrossCheck";
-import assignCookiesOnAuth from "../utils/assignNewCookies";
-import { initiateSocials } from "../controllers/socialsController";
+import { sendOtp, sendFinalMail } from "../utils/mailer.js";
+import OTP from "../models/auth/otpsModel.js";
+import routeHandler from "../middlewares/globalErrWrap.js";
+import otpCrossCheck from "../utils/otpCrossCheck.js";
+import assignCookiesOnAuth from "../utils/assignNewCookies.js";
+import { initiateSocials } from "../controllers/socialsController.js";
 
 const router = express.Router();
 
@@ -101,15 +101,18 @@ router.post(
     const { otp, email } = req.body;
     const isValid = await OTP.findOne({ user: email, otp: otp });
 
+    const isProduction = process.env.NODE_ENV === "production";
+
     if (isValid) {
       const acknowledgement = jwt.sign({ email }, `${process.env.JWT_SECRET}`, {
         expiresIn: "2m",
       });
       //Sending a acknowledgement to cross check whether the user has verified the otp or not for security bases.
+
       res.cookie("otpAuth", acknowledgement, {
         httpOnly: true,
-        secure: false,
-        sameSite: "lax",
+        secure: isProduction,
+        sameSite: isProduction ? "none" : "lax",
         maxAge: 1000 * 60 * 2,
       });
 

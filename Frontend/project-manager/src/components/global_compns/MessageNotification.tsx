@@ -14,10 +14,6 @@ const MessageNotification = () => {
 
     const notificationRef = useRef<HTMLAudioElement | null>(null);
 
-    if (typeof window !== "undefined") {
-        notificationRef.current = new Audio("/sounds/notification_web.mp3");
-    }
-
     useEffect(() => {
         const initializeNotification = async () => {
             if (msg !== null) {
@@ -29,10 +25,9 @@ const MessageNotification = () => {
                     setSenderName(res.profileData.fullname || "Unknown");
                     setVisible(true);
 
-                    if (notificationRef.current) {
-                        notificationRef.current.play().catch((error) => {
-                            console.log("User hasn't interacted with the page yet.");
-                        });
+                    if (typeof window !== "undefined") {
+                        notificationRef.current = new Audio("/sounds/notification_web.mp3");
+                        notificationRef.current.play();
                     }
 
                     // Notification Only Visible For 5 Seconds

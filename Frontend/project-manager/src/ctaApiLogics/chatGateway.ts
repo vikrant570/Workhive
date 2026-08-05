@@ -1,10 +1,20 @@
 import api from "@/lib/axios";
 import io from "socket.io-client";
 
-// @ts-expect-error
-export const socket = io("http://localhost:8000", { withCredentials: true });
+let socketInstance: ReturnType<typeof io> | null = null;
 
-interface socketRes {
+const getSocket = () => {
+  if (typeof window !== "undefined" && !socketInstance) {
+    const backend = process.env.NEXT_PUBLIC_BACKEND_URL.replace("/manager", "") || "";
+    //@ts-expect-error
+    socketInstance = io(backend, { withCredentials: true });
+  }
+  return socketInstance;
+};
+
+export const socket = getSocket();
+
+export interface socketRes {
   status: string,
   code: string,
   message?: string
@@ -13,6 +23,8 @@ interface socketRes {
 
 //Sending Message TO Someone
 export const sendMessage = async (chatID: string, message: string): Promise<{ success: boolean, _id: string }> => {
+  if (!socket) throw new Error("Unable To Connect To The Server! Try Again Later");
+
   return new Promise((resolve) => {
     socket.emit("sendMessage", chatID, message, (response: socketRes) => {
       resolve({ success: response.status == "ok", _id: response._id });
@@ -35,12 +47,15 @@ interface chatRes {
   myChats: Chat[]
 }
 
+// Final Action: Sends Invites
 const sendInvites = async (allChats: Chat[], projectID: string) => {
+  if (!socket) throw new Error("Unable To Connect To The Server! Try Again Later");
   try {
     await Promise.all(
       allChats.map((c) => {
         // Waiting For Acknowledgement For Every Invitation Sent Successfully
         return new Promise((resolve, reject) => {
+
           socket.emit("sendMessage", c._id, projectID, (response: socketRes) => {
             if (response.status === "ok") {
               resolve(response);

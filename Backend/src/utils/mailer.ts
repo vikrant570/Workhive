@@ -1,4 +1,4 @@
-import OTP from "../models/auth/otpsModel";
+import OTP from "../models/auth/otpsModel.js";
 import otpGen from "otp-generator";
 import nodemailer from "nodemailer";
 
@@ -162,7 +162,6 @@ export const sendFinalMail = async (
   //Welcome Mail sent
   transport.sendMail(mailOptions, (err, info) => {
     if (err) {
-      console.log(err.message);
       return;
     }
   });

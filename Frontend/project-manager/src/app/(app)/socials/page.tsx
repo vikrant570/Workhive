@@ -43,7 +43,7 @@ interface searchResultException extends professionalUserInfo {
 const Socials = () => {
     const [UserSocials, setUserSocials] = useState<UserSocials>();
     const [requestsLength, setRequestsLength] = useState<number>(0);
-    const [error, setError] = useState<string>("");
+    const [error, setError] = useState<string | null>(null);
 
     const { showToastMsg } = useToastMsgContext();
 
@@ -111,8 +111,8 @@ const Socials = () => {
         }
     }
 
-    if (error !== "") {
-        return <FullContentError page="Socials" error={error} />
+    if (error) {
+        return <FullContentError page="Socials" error={error} setError={setError} />
     }
 
     return (

@@ -1,7 +1,7 @@
 import jwt from "jsonwebtoken";
-import { IONext, IOSocket } from "../types/socket";
+import { IONext, IOSocket } from "../types/socket.js";
 import { IncomingMessage } from "http";
-import { AccessCookieData } from "../types";
+import { AccessCookieData } from "../types/index.js";
 
 interface RequestCookies extends IncomingMessage {
   cookies: { [key: string]: string };

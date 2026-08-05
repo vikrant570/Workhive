@@ -24,7 +24,6 @@ const SocialActionDropDown = ({ userID, view, setBlocked, setReqSent, setDropDow
 
         if (!res.success) {
             showToastMsg({ text: res.message, type: "error" });
-            console.log(res.message)
             return;
         }
 

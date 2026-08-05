@@ -2,8 +2,6 @@ import { getNameInitials } from "@/utils/nameInitials";
 import Link from "next/link";
 import {
     LuArrowLeft,
-    LuMessageSquare,
-    LuUserPlus,
     LuMail,
     LuGlobe,
     LuGithub,
@@ -11,14 +9,10 @@ import {
     LuLinkedin,
     LuUsers,
     LuBriefcase,
-    LuFolderDot,
-    LuFlag,
-    LuX,
+    LuFolderDot
 } from "react-icons/lu";
 
-import { LiaUserClockSolid } from "react-icons/lia";
 import { fetchUserProfile_server } from "@/lib/fetchData.server";
-import { socialActionsHandle } from "@/ctaApiLogics/socialsGateway";
 import SocialActionButtonForProfileView from "../components/SocialActionButton";
 
 // --- Mock Data ---
@@ -83,10 +77,8 @@ export default async function AnotherUserProfile({ params }: params) {
 
                     {/* Main Profile Card */}
                     <div className="bg-ui-secondary rounded-3xl border border-ui-tertiary/10 p-8 text-center shadow-lg relative overflow-hidden">
-                        {/* Ambient Glow */}
                         <div className="absolute top-0 left-1/2 -translate-x-1/2 w-32 h-32 bg-buttons/10 blur-3xl rounded-full"></div>
 
-                        {/* Avatar */}
                         <div className="relative inline-block mb-6">
                             <div className="w-32 h-32 rounded-full bg-gradient-to-br from-ui-tertiary/20 to-ui-main border-4 border-ui-main flex items-center justify-center text-4xl font-bold text-texts-primary shadow-xl z-10 relative">
                                 {getNameInitials(String(profileData.fullname))}
@@ -102,7 +94,7 @@ export default async function AnotherUserProfile({ params }: params) {
                             <span>{profileData.jobTitle} at <span className="text-texts-primary">{profileData.workplace}</span></span>
                         </div>
 
-                        {/* Actions */}
+                        {/* Social CTA Button */}
                         <div className="space-y-3 relative">
                             <SocialActionButtonForProfileView socialBooleans={PropsToBePassed} />
                         </div>
@@ -129,7 +121,7 @@ export default async function AnotherUserProfile({ params }: params) {
 
                 </div>
 
-                {/* Right Column: Details (Span 8) */}
+                {/* Right Column */}
                 <div className="lg:col-span-8 space-y-6">
 
                     {/* About Section */}

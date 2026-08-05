@@ -1,12 +1,16 @@
 "use client"
-import { useUserContext } from "@/contexts/UserContext";
 import { fetchUserProfile_client } from "@/lib/fetchData.client";
+
 import { parseDate } from "@/utils/dateTimeFormatter";
 import handleError from "@/utils/handleError";
 import { getNameInitials } from "@/utils/nameInitials";
-import Link from "next/link";
+
+import { useUserContext } from "@/contexts/UserContext";
 import { useEffect, useState } from "react";
-import { LuBriefcase, LuCheck, LuChevronRight, LuCross, LuTimer, LuTimerOff } from "react-icons/lu";
+import Link from "next/link";
+
+import { LuBriefcase, LuCheck, LuChevronRight, LuCross, LuTimer } from "react-icons/lu";
+import { IoCheckmarkDoneOutline } from "react-icons/io5";
 
 interface Message {
     _id: string,
@@ -34,6 +38,7 @@ const ProjectInviteCard: React.FC<Props> = ({ invite, userID }) => {
 
     // Fetch Partial Of The Sender Of The Invite
     useEffect(() => {
+        console.log(invite);
         try {
             const fetchHostDetails = async (hostID: string) => {
                 const res = await fetchUserProfile_client(hostID, "1");
@@ -54,30 +59,40 @@ const ProjectInviteCard: React.FC<Props> = ({ invite, userID }) => {
     // Set Dynamic Button/Icon For Different Invite Statuses
     const setActionForInviteStatus = () => {
         const status = invite.inviteStatus;
+        const baseClass = "flex items-center justify-center gap-1 text-xs font-medium rounded-md py-1 px-2"
 
         switch (status) {
             case ("Pending"):
+                if (user?._id === invite.senderID) {
+                    return (
+                        <span className={`${baseClass} text-texts-important bg-ui-tertiary/10`}>
+                            {status} &nbsp;<LuTimer size={14} />
+                        </span>
+                    )
+                }
                 return (
-                    <span className="flex items-center justify-center gap-1 text-xs font-bold main-btn">
+                    <span className={`${baseClass} bg-buttons/90 hover:bg-buttons/70 cursor-pointer transition-all duration-100 hover:scale-102`}>
                         View <LuChevronRight size={14} />
                     </span>
                 );
+
             case "Rejected":
                 return (
-                    <span className="flex items-center justify-center gap-1 text-xs font-bold bg-red-600/50 rounded-md py-1 px-2">
+                    <span className={`${baseClass} bg-red-600/50`}>
                         {status} &nbsp;<LuCross size={14} />
                     </span>
                 );
+
             case "Expired":
                 return (
-                    <span className="flex items-center justify-center gap-1 text-xs font-bold bg-texts-important/60 rounded-md py-1 px-2">
-                        {status} &nbsp;<LuTimerOff size={14} />
+                    <span className={`${baseClass} bg-ui-tertiary/10 text-texts-secondary stroke-1 stroke-alerts/40`}>
+                        {status} &nbsp;<LuTimer size={14} />
                     </span>
                 );
             case "Accepted":
                 return (
-                    <span className="flex items-center justify-center gap-1 text-xs font-bold bg-green-500/45 rounded-md py-1 px-2">
-                        {status} &nbsp;<LuTimerOff size={14} />
+                    <span className={`${baseClass} bg-ui-tertiary/10 text-green-500/60`}>
+                        View &nbsp;<LuCheck size={14} />
                     </span>
                 );
 
@@ -91,14 +106,14 @@ const ProjectInviteCard: React.FC<Props> = ({ invite, userID }) => {
         return (
             <div className="w-full max-w-[80%] md:max-w-md rounded-2xl px-4 py-3 relative shadow-md bg-ui-main border border-ui-tertiary/10">
                 <p className="text-texts-secondary text-xs">
-                    <LuTimer size={12} className="inline" /> This message is unavailable.
+                    <LuTimer size={10} className="inline" /> This message is unavailable.
                 </p>
             </div>
         )
     }
 
     // Destination Link For Invite Card
-    const url = (invite.inviteStatus == "Expired" || "Rejected") ?
+    const url = (invite.inviteStatus === "Expired" || invite.inviteStatus === "Rejected") ?
         '/#' :
         `/projects/${invite.project._id}?isOwner=${userID == invite.senderID ? "1" : "0"}&isInvite=1`;
 
@@ -107,7 +122,7 @@ const ProjectInviteCard: React.FC<Props> = ({ invite, userID }) => {
             href={url}
             className={`flex ${invite.senderID == userID ? 'justify-end' : 'justify-start'} animate-in fade-in slide-in-from-bottom-2 duration-300`}
         >
-            <div className={`w-full max-w-[80%] md:max-w-md rounded-2xl ${invite.senderID == userID ? "rounded-tr-sm" : "rounded-tl-sm"} px-4 py-3 relative shadow-md bg-ui-main border border-ui-tertiary/10`}>
+            <div className={`w-full max-w-[80%] md:max-w-md rounded-2xl ${invite.senderID == userID ? "rounded-tr-sm" : "rounded-tl-sm"} ${url === "#" ? "cursor-default" : "hover:bg-ui-secondary/40 transition-all duration-200"} px-4 py-3 relative shadow-md bg-ui-main border border-ui-tertiary/10`}>
 
                 {/* Embedded Project Card */}
                 {invite?.project && senderDetails !== null && (
@@ -131,7 +146,7 @@ const ProjectInviteCard: React.FC<Props> = ({ invite, userID }) => {
                         </div>
 
                         {/* Project Title & Action Button */}
-                        <div className="flex items-center justify-between gap-4">
+                        <div className="flex items-end justify-between gap-4">
                             <div className="flex-1 min-w-0">
                                 <p className="text-[9px] text-texts-secondary uppercase tracking-widest mb-0.5">For</p>
                                 <p className="text-sm font-bold text-texts-primary truncate" title={invite.project.title}>
@@ -156,7 +171,7 @@ const ProjectInviteCard: React.FC<Props> = ({ invite, userID }) => {
                         {parseDate(new Date(invite.createdAt)).split(",")[1]}
                     </span>
                     {invite.delivered && invite.senderID === userID && (
-                        <LuCheck size={14} className="text-buttons ml-1" />
+                        <IoCheckmarkDoneOutline size={14} className="text-buttons ml-1" />
                     )}
                 </div>
             </div>

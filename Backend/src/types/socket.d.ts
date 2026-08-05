@@ -6,7 +6,7 @@ export interface ServerToClientEvents {
   noArg: () => void;
   basicEmit: (a: number, b: string, c: Buffer) => void;
   withAck: (d: string, callback: (e: number) => void) => void;
-  messageReceived: (message : any) => void;
+  messageReceived: (message: any) => void;
 }
 
 // 2. Events sent from Client to Server
@@ -14,7 +14,8 @@ export interface ClientToServerEvents {
   hello: () => void;
   join_room: (roomId: string) => void;
   sendMessage: (chatID: string, message: string, callback: (res: any) => void) => void;
-  inviteToProject : (chatID: string, project: any, callback: (res:any) => void) => void;
+  askReport: (memberId: string, taskTitle: string, projectTitle: string, callback: (res: any) => void) => void;
+  inviteToProject: (chatID: string, project: any, callback: (res: any) => void) => void;
 }
 
 // 3. Inter-server events (if using multiple nodes/Redis)
@@ -24,7 +25,7 @@ export interface InterServerEvents {
 
 // 4. Socket Data (This is important! Type your custom properties here)
 export interface SocketData {
-  user :{
+  user: {
     userID: string | Types.ObjectId;
   }
 }

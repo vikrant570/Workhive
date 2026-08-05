@@ -148,7 +148,7 @@ const ChatsContent = () => {
   }, [msg]);
 
   if (error) {
-    return <FullContentError page={"Chats"} error={error} />
+    return <FullContentError page={"Chats"} error={error} setError={setError} />
   }
 
   return (

@@ -1,6 +1,6 @@
 import { Types } from "mongoose";
-import userSocials from "../models/userSocialsModel";
-import Chats from "../models/messaging/chatsModel";
+import userSocials from "../models/userSocialsModel.js";
+import Chats from "../models/messaging/chatsModel.js";
 
 export const sendConnectionRequest = async (
   userID: string,
@@ -108,7 +108,7 @@ export const blockConnection = async (
   )
 
   // Set the chat status to blocked too
-  const chat = await Chats.findOne({ participants: [userID, userToBeActedUpon] })
+  const chat = await Chats.findOne({ p2pKey: [String(userID), String(userToBeActedUpon)].sort().join("_") })
 
   if (chat) {
     chat.blocked = true;
@@ -155,7 +155,14 @@ export const unblockConnection = async (
 
   const response2 = await userSocials.findOneAndUpdate({ user: userToBeActedUpon }, {
     $pull: { blockedBy: userID }
-  })
+  });
+
+  const respectiveChat = await Chats.findOne({ p2pKey: [String(userID), String(userToBeActedUpon)].sort().join("_") })
+
+  if (respectiveChat) {
+    respectiveChat.blocked = false;
+    await respectiveChat.save();
+  }
 
   if (!response1 || !response2) throw new Error("Unable to process your request!")
 }

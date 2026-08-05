@@ -27,7 +27,6 @@ const SocialActionButtonForProfileView = ({ socialBooleans }: Props) => {
 
     const handleAllCallsLocally = async (action: "request" | "remove" | "block" | "withdraw" | "unblock") => {
         if (coolDownTimer.current) return;
-        console.log(action);
 
         coolDownTimer.current = setTimeout(() => {
             coolDownTimer.current = null;

@@ -25,7 +25,7 @@ export default async function Home() {
             <div className="flex flex-col gap-8" id="container-homepage">
                 {/* New Project Card And Updates Preview */}
                 <div className="flex flex-row items-center justify-between lg:col-span-4 md:col-span-2 flex-wrap gap-2">
-                    <Link className="lg:w-[67%] bg-ui-secondary rounded-3xl p-1 relative overflow-hidden group cursor-pointer transition-transform hover:-translate-y-1" href="/projects/createProject">
+                    <Link className="lg:w-[67%] bg-ui-secondary rounded-3xl p-1 relative overflow-hidden group cursor-pointer transition-transform hover:-translate-y-1" href="/projects/create">
                         <div className="absolute inset-0 bg-gradient-to-br from-buttons/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
                         <div className="h-full bg-ui-secondary rounded-[20px] p-6 border border-ui-tertiary/10 flex flex-col items-center justify-center text-center relative z-10">
                             <div className="w-16 h-16 bg-buttons rounded-2xl flex items-center justify-center mb-4 shadow-lg shadow-buttons/20 group-hover:scale-110 transition-transform">

@@ -24,14 +24,13 @@ export const MessageContextProvider = ({ children }: { children: React.ReactNode
 
     useEffect(() => {
         if (activate === true) {
-            console.log("Socket Turned On!")
-            socket.on("messageReceived", (msg: Msg) => {
+            socket?.on("messageReceived", (msg: Msg) => {
                 setMsg(msg)
             });
         }
 
         return () => {
-            socket.off("messageReceived");
+            socket?.off("messageReceived");
         }
     }, [activate]);
 

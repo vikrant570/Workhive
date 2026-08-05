@@ -8,97 +8,61 @@ import {
 import { parseDate } from "@/utils/dateTimeFormatter";
 import ConnectionsList from "@/components/ConnectionsList";
 import { fetchSingleProject_server } from "@/lib/fetchData.server";
-import CtaProjectBtn from "@/app/(app)/projects/components/CtaProjectBtn";
+import { EditORViewAccess, TaskEllipsesDropDown } from "../components/CtaProjectBtns";
 import FullContentError from "@/components/global_compns/FullContentError";
+import { getAttachmentIcon, getStatusBadge } from "@/utils/otherUItools";
 
 // Interfaces
-interface Task {
+export interface Task {
+   _id: string
    title: string;
    assignedTo: {
+      _id: string;
       fullname: string
    }
    status: string;
+   department?: string
 }
 interface Member {
    _id: string,
    fullname: string;
    username: string;
 }
-interface Project {
+export interface Project {
    _id: string;
    title: string;
    owner: {
+      _id: string
       fullname: string,
       username: string
    },
-   createdAt: Date;
-   deadline: Date;
-   priority: string;
+   createdAt: string;
+   deadline: string;
+   priority: "high" | "medium" | "low";
    members: Member[];
    tasks: Task[];
    attachments: string[];
-   status: string;
-   progress: number;
-   inviteStatus: 'Pending' | 'Accepted' | 'Rejected' | 'Expired'
+   status: "Completed" | "Cancelled" | "In progress";
+   departments?: {
+      name: string,
+      head: Omit<partialUserInfo, "username">
+   }
+   progress: number
 }
-interface NextApiRes {
+interface SingleProjectRes {
    success: boolean,
    project?: Project,
+   isOwner?: boolean,
    message?: string
 }
 
-// --- Helper Functions ---
-
-// 1. Status Badge Helper
-const getStatusBadge = (status: string) => {
-   switch (status.toLowerCase()) {
-      case "completed":
-         return (
-            <span className="flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold bg-green-500/10 text-green-500 border border-green-500/20">
-               <LuCircleCheck size={12} /> Completed
-            </span>
-         );
-      case "in progress":
-         return (
-            <span className="flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold bg-blue-500/10 text-blue-500 border border-blue-500/20">
-               <LuClock size={12} /> In Progress
-            </span>
-         );
-      case "cancelled":
-         return (
-            <span className="flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold bg-red-500/10 text-red-500 border border-red-500/20">
-               <LuCircleAlert size={12} /> Cancelled
-            </span>
-         );
-      default:
-         return (
-            <span className="flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold bg-ui-tertiary/10 text-texts-secondary border border-ui-tertiary/20">
-               <LuCircle size={12} /> Pending
-            </span>
-         );
-   }
-};
-
-// 2. Attachment Icon Helper
-const getAttachmentIcon = (filename: string) => {
-   const ext = filename!.split('.')[1].toLowerCase();
-   if (['jpg', 'png', 'jpeg', 'gif'].includes(ext)) return <LuImage size={18} className="text-purple-400" />;
-   if (['pdf', 'doc', 'docx', 'txt'].includes(ext)) return <LuFileText size={18} className="text-blue-400" />;
-   return <LuPaperclip size={18} className="text-texts-secondary" />;
-};
-
 export default async function ProjectDisplay({ params, searchParams }: { params: Promise<{ id: string }>, searchParams: Promise<{ isOwner: string, isInvite?: string }> }) {
    const { id } = await params;
-   const { isOwner, isInvite } = await searchParams;
+   const { isInvite } = await searchParams;
 
    let project: Project;
 
-   const data: NextApiRes = await fetchSingleProject_server(id);
-
-   // Accept Project Invite --
-   const acceptProjectInvite = async () => {
-
-   }
+   const data: SingleProjectRes = await fetchSingleProject_server(id);
 
    if (data.success && data.project) {
       project = data.project;
@@ -127,7 +91,7 @@ export default async function ProjectDisplay({ params, searchParams }: { params:
                </div>
 
                {/* -- Call To Action Button - (Edit / Accpet / Null) -- */}
-               <CtaProjectBtn isOwner={isOwner || ""} isInvite={isInvite || ""} projectId={id} />
+               <EditORViewAccess type={data.isOwner === true ? "ownerView" : (isInvite === "1" ? "invite" : "none")} projectId={id} />
 
             </div>
             <div className="h-0.5 w-full bg-gradient-to-r from-buttons to-transparent mt-6 opacity-50"></div>
@@ -167,12 +131,12 @@ export default async function ProjectDisplay({ params, searchParams }: { params:
                   <p className="text-xs text-texts-secondary uppercase tracking-wider font-semibold flex items-center gap-1">
                      <LuFlag size={12} /> Overall Progress
                   </p>
-                  <span className="text-lg font-bold text-buttons">{project?.progress}%</span>
+                  <span className="text-lg font-bold text-buttons">{project.progress}%</span>
                </div>
                <div className="w-full h-2 rounded-full bg-ui-main overflow-hidden">
                   <div
                      className="h-full rounded-full bg-gradient-to-r from-buttons to-indigo-500 transition-all duration-1000 ease-out"
-                     style={{ width: `${project?.progress}%` }}
+                     style={{ width: `${project.progress}%` }}
                   ></div>
                </div>
             </div>
@@ -195,7 +159,7 @@ export default async function ProjectDisplay({ params, searchParams }: { params:
 
                   <div className="space-y-3 max-h-[400px] overflow-y-auto pr-2 custom-scrollbar">
                      {project?.tasks.map((task, i) => (
-                        <div key={i} className={`p-4 rounded-2xl border transition-colors flex items-center justify-between group ${task.status === 'Cancelled' ? 'bg-ui-main/30 border-transparent opacity-60' : 'bg-ui-main border-ui-tertiary/5 hover:border-buttons/30'
+                        <div key={i} className={`relative p-4 rounded-2xl border transition-colors flex items-center justify-between group ${task.status === 'Cancelled' ? 'bg-ui-main/30 border-transparent opacity-60' : 'bg-ui-main border-ui-tertiary/5 hover:border-buttons/30'
                            }`}>
                            <div className="flex items-center gap-4">
                               <div className={`w-2 h-2 rounded-full ${task.status === 'Completed' ? 'bg-green-500' : task.status === 'In Progress' ? 'bg-blue-500' : 'bg-ui-tertiary'}`}></div>
@@ -210,9 +174,7 @@ export default async function ProjectDisplay({ params, searchParams }: { params:
                            </div>
                            <div className="flex items-center gap-4">
                               {getStatusBadge(task.status)}
-                              <button className="p-1 text-texts-secondary hover:text-texts-primary hover:bg-ui-secondary rounded transition-colors opacity-0 group-hover:opacity-100">
-                                 <LuEllipsisVertical size={16} />
-                              </button>
+                              {data.isOwner && <TaskEllipsesDropDown projectTitle={project.title} projectOwner={project.owner._id} projectTask={task} />}
                            </div>
                         </div>
                      ))}

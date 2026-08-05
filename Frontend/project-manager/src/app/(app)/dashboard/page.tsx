@@ -4,7 +4,7 @@ import {
 } from "react-icons/lu";
 import { CgSpinner } from "react-icons/cg";
 
-import ProjectPreview from "../../../components/ProjectsList";
+import ProjectPreview from "../projects/components/ProjectsList";
 import { Suspense } from "react";
 
 // API Imports

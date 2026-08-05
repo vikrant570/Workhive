@@ -1,5 +1,5 @@
 import express from "express";
-import isLoggedIn from "../middlewares/isLoggedIn";
+import isLoggedIn from "../middlewares/isLoggedIn.js";
 import {
   acceptConnectionRequest,
   blockConnection,
@@ -8,10 +8,10 @@ import {
   sendConnectionRequest,
   unblockConnection,
   withdrawConnectionRequest
-} from "../controllers/socialsController";
-import userSocials from "../models/userSocialsModel";
-import routeHandler from "../middlewares/globalErrWrap";
-import Users from "../models/auth/usersModel";
+} from "../controllers/socialsController.js";
+import userSocials from "../models/userSocialsModel.js";
+import routeHandler from "../middlewares/globalErrWrap.js";
+import Users from "../models/auth/usersModel.js";
 import { Types } from "mongoose";
 const router = express.Router();
 
@@ -101,7 +101,7 @@ router.get("/", isLoggedIn, routeHandler(async (req, res) => {
 
   switch (view) {
     case "project":
-      responseKey = "connectionsList",
+      responseKey = "members",
         socials = await userSocials.findOne(
           { user: req.user.userID },
           { connections: 1 })

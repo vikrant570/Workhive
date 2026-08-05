@@ -93,13 +93,13 @@ const ChatInterface: React.FC<ChatProps> = ({ chatID, chatName, setChatOpen, set
 
       if (!res.data.success && res.data.message == "Chat Doesn't Exist!") return;
       const msgs = (res.data as Res).messages;
-      console.log(msgs);
+      console.log(msgs[0]);
 
       setMessages((prev) => [...msgs, ...prev]);
       setHasMore(res.data.hasMore)
 
       // Setting The Cursor To The TopMost Message
-      if (msgs.length > 0) setCursor((msgs[0] as Msg)?._id);
+      if (msgs?.length > 0) setCursor((msgs[0] as Msg)?._id);
 
       messagesEndRef.current?.scrollTo({ behavior: "smooth" });
     }
@@ -181,6 +181,7 @@ const ChatInterface: React.FC<ChatProps> = ({ chatID, chatName, setChatOpen, set
 
       setInteraction(messageSent);
       setMessages((prev) => [...prev, messageSent]);
+      messagesEndRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
 
       setInputValue(null);
     }
@@ -198,7 +199,7 @@ const ChatInterface: React.FC<ChatProps> = ({ chatID, chatName, setChatOpen, set
               setError("");
               fetchMessages(cursor);
             }}
-            className="text-mdflex items-center justify-center gap-2 px-6 py-3 bg-buttons text-ui-main rounded-xl font-bold hover:bg-buttons/90 hover:scale-105 transition-all shadow-lg shadow-buttons/20 active:scale-95"
+            className="text-sm cursor-pointer flex items-center justify-center m-auto gap-2 px-4 py-2.5 bg-buttons text-ui-main rounded-xl font-bold hover:bg-buttons/90 hover:scale-105 transition-all shadow-lg shadow-buttons/20 active:scale-95"
           >
             <LuRefreshCcw size={18} />
             Try Again

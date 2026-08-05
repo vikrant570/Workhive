@@ -1,5 +1,5 @@
 import { Types } from "mongoose";
-import Tokens from "../models/auth/tokensModel";
+import Tokens from "../models/auth/tokensModel.js";
 import jwt from "jsonwebtoken";
 
 interface decodedToken {

@@ -27,7 +27,13 @@ export default function handleError(error: any, errType: "axios" | "proxy" | "un
 
     switch (errType) {
         case "axios":
-            return handleAxiosError(error);
+            const errMessage: string = handleAxiosError(error);
+            if (errMessage.startsWith("<") || errMessage.slice(0, 10).includes("<")) {
+                return "Some internal error occured! Please try again later."
+            }
+            else {
+                return errMessage
+            }
         case "proxy":
             return handleProxyError(error);
         default:

@@ -29,7 +29,7 @@ export const socialActionsHandle = async (
 
         const { success } = response.data;
 
-        if (success && action == 'request') {
+        if (success && action == 'request' && typeof window !== "undefined") {
             const tone = new Audio("/sounds/send_request_web.mp3");
             tone && tone.play()
         }

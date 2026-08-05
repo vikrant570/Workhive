@@ -1,22 +1,22 @@
 import mongoose from "mongoose";
 
 const messageSchema = new mongoose.Schema({
-    chatID:{
-        type : mongoose.Schema.Types.ObjectId,
-        ref : "chats",
-        index : true,
-        required : true
+    chatID: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "chats",
+        index: true,
+        required: true
     },
-    senderID : {
-        type : mongoose.Schema.Types.ObjectId,
+    senderID: {
+        type: mongoose.Schema.Types.ObjectId,
         ref: 'users'
     },
-    text:{
-        type : String,
-        required : true,
-        maxlength : 300
+    text: {
+        type: String,
+        required: true,
+        maxlength: 300
     },
-    project : {
+    project: {
         type: mongoose.Schema.Types.ObjectId,
         ref: 'projects'
     },
@@ -25,10 +25,10 @@ const messageSchema = new mongoose.Schema({
         default: false
     },
     inviteStatus: {
-        type : String,
-        enum : ['Accepted', 'Rejected', 'Expired', 'Pending']
+        type: String,
+        enum: ['Accepted', 'Rejected', 'Expired', 'Pending']
     }
-},{timestamps : true});
+}, { timestamps: true });
 
 const Messages = mongoose.model('messages', messageSchema);
 export default Messages;

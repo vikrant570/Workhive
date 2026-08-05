@@ -1,8 +1,8 @@
 import { NextFunction, Request, Response } from "express";
 import jwt from "jsonwebtoken";
-import { generateRefreshToken, regenerateAccessToken } from "../utils/renewTokens";
-import { AccessCookieData } from "../types/index";
-import Tokens from "../models/auth/tokensModel";
+import { generateRefreshToken, regenerateAccessToken } from "../utils/renewTokens.js";
+import { AccessCookieData } from "../types/index.js";
+import Tokens from "../models/auth/tokensModel.js";
 import { Types } from "mongoose";
 
 interface decodedToken {
@@ -22,6 +22,9 @@ const isLoggedIn = async (req: Request, res: Response, next: NextFunction) => {
   const accessToken = req.cookies.access;
   const refreshToken = req.cookies.refresh;
   const secret = process.env.JWT_SECRET;
+
+  // Cookie Config (Dev || Production)
+  const isProduction = process.env.NODE_ENV === "production";
 
   if (!secret) throw new Error("Unauthorised! Access Revoked.")
 
@@ -49,8 +52,7 @@ const isLoggedIn = async (req: Request, res: Response, next: NextFunction) => {
 
     if (!isAuthentic) throw new Error("Authentication Error !");
 
-    // Refresh Token Authenticyt verified, generating new and deleting old token
-
+    // Refresh Token Authenticity verified, generating new and deleting old token
     const newAccessToken = await regenerateAccessToken(refreshToken);
     const newRefreshTokenNeeded = refreshTokenValidity(refreshToken);
 
@@ -63,16 +65,16 @@ const isLoggedIn = async (req: Request, res: Response, next: NextFunction) => {
 
       res.cookie("refresh", renewedRefreshToken.token, {
         httpOnly: true,
-        sameSite: "lax",
-        secure: false,
+        sameSite: isProduction ? "none" : "lax",
+        secure: isProduction,
         maxAge: 1000 * renewedRefreshToken.age
       });
     };
 
     res.cookie("access", newAccessToken, {
       httpOnly: true,
-      secure: false,
-      sameSite: "lax",
+      sameSite: isProduction ? "none" : "lax",
+      secure: isProduction,
       maxAge: 1000 * 60 * 60 * 24
     });
 

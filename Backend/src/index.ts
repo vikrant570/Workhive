@@ -1,13 +1,13 @@
 import express, { Request, Response, NextFunction } from "express";
 import cookieParser from "cookie-parser";
 import cors from "cors";
-import "./websockets/webSocketSetup";
+import "./websockets/webSocketSetup.js";
 
 //Routes
-import userGateway from "./routes/userGateway";
-import projectGateway from "./routes/projectGateway";
-import chats from "./routes/chats";
-import socials from "./routes/socialsGateway";
+import userGateway from "./routes/userGateway.js";
+import projectGateway from "./routes/projectGateway.js";
+import chats from "./routes/chats.js";
+import socials from "./routes/socialsGateway.js";
 
 // .env file setup and config using a safer side
 import dotenv from "dotenv";
@@ -17,10 +17,14 @@ import { fileURLToPath } from "url";
 // Configurations
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
-dotenv.config({ path: path.resolve(__dirname, "../.env") });
+
+const isProduction = process.env.NODE_ENV === "production";
+if (!isProduction) {
+  dotenv.config({ path: path.resolve(__dirname, "../.env") });
+}
 
 //Custom Middlewares
-import isLoggedIn from "./middlewares/isLoggedIn";
+import isLoggedIn from "./middlewares/isLoggedIn.js";
 
 const app = express();
 
@@ -30,7 +34,7 @@ app.use(cookieParser());
 app.use(express.static(path.resolve("./public")));
 app.use(
   cors({
-    origin: ["http://localhost:3000", "192.168.18.124:3000"],
+    origin: [process.env.CLIENT_URL],
     credentials: true,
   })
 );
@@ -47,9 +51,11 @@ interface Error {
   message: string
 }
 app.use((err: Error, req: Request, res: Response, next: NextFunction) => {
+  let errorMessage = err.message;
+
   res.status(err.status || 500).json({
     success: false,
-    message: err.message || "Something Went Wrong !"
+    message: errorMessage || "Something Went Wrong !"
   })
 })
 

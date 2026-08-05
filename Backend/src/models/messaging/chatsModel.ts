@@ -13,7 +13,8 @@ interface IChat {
     participants: Array<mongoose.Types.ObjectId>,
     lastMessage: any,
     groupName?: string,
-    blocked: boolean
+    blocked: boolean,
+    p2pKey?: string
 }
 
 const chatSchema = new mongoose.Schema<IChat>({
@@ -49,6 +50,12 @@ const chatSchema = new mongoose.Schema<IChat>({
     blocked: {
         type: Boolean,
         default: false
+    },
+    p2pKey: {
+        type: String,
+        unique: true,
+        index: true,
+        sparse: true
     }
 }, { timestamps: true });
 

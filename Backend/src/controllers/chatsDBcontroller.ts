@@ -1,6 +1,6 @@
 import { Request, Response } from "express";
-import Chats from "../models/messaging/chatsModel";
-import Messages from "../models/messaging/messagesModel";
+import Chats from "../models/messaging/chatsModel.js";
+import Messages from "../models/messaging/messagesModel.js";
 import mongoose, { isValidObjectId } from "mongoose";
 
 //Get All Chats (List)
@@ -14,21 +14,15 @@ export const getAllChats = async (req: Request, res: Response) => {
   const { projectSetup } = req.query;
   const participants: Array<{ _id: string }> = req.body.participants;
 
-  if (projectSetup && projectSetup == "1" && participants) {
+  if (projectSetup && projectSetup == "1" && participants.length > 0) {
     const destructuredParticipants = participants.map(p => p._id);
 
     await Promise.all(
       destructuredParticipants.map(async (p) => {
-        // Converting userID and p to mongoose ObjectId(s) because .aggregate() is type sensitive
         const chat = await Chats.aggregate([
           {
             $match: {
-              participants: {
-                $all: [
-                  new mongoose.Types.ObjectId(userID),
-                  new mongoose.Types.ObjectId(p)
-                ], $size: 2
-              }
+              p2pKey: [String(userID), String(p)].sort().join("_")
             }
           },
           {
@@ -75,15 +69,18 @@ export const getAllChats = async (req: Request, res: Response) => {
 }
 
 //CREATE NEW CHAT
-export const createNewChat = async (participants: string[]) => {
+export const createNewChat = async (participants: string[], checked: boolean = false) => {
   const chatType = participants.length === 2 ? "p2p" : "group";
 
-  const alreadyExists = await Chats.findOne({ participants: { $all: participants, $size: participants.length } }, { _id: 1 });
-  if (alreadyExists) throw new Error("Chat Already Exists!")
+  if (!checked) {
+    const alreadyExists = await Chats.findOne({ participants: { $all: participants, $size: participants.length } }, { _id: 1 });
+    if (alreadyExists) throw new Error("Chat already exists!")
+  }
 
   const newChat = await Chats.create({
     chatType,
     participants,
+    ...(chatType === "p2p" && { p2pKey: [String(participants[0]), String(participants[1])].sort().join("_") })
   });
 
   if (!newChat) throw new Error("Failed to send message !");
@@ -99,28 +96,23 @@ export const createNewChat = async (participants: string[]) => {
 // DELETE EXISTING CHAT
 export const deleteExistingChat = async (req: Request, res: Response) => {
   const chatID = req.body.chatID;
+  const userID = req.user?.userID;
+
   if (!chatID)
     return res.status(400).json({ success: false, message: "Bad request!" });
 
-  const findExistingChat = await Chats.findOne({ chatID: chatID });
+  const findExistingChat = await Chats.findOne({ _id: chatID });
 
   //Only delete if user is the participant
-  if (
-    findExistingChat &&
-    req.user?.userID &&
-    findExistingChat.participants.some(
-      (participant: any) =>
-        participant?.toString() === req.user!.userID!.toString()
-    )
-  ) {
-    await Chats.findOneAndUpdate(
-      { chatID: chatID },
-      { $pull: { participants: req.user.userID } }
-    );
+  if (findExistingChat && userID && findExistingChat.participants.some((participant: any) =>
+    participant?.toString() === userID
+  )) {
+    await Chats.findOneAndUpdate({ _id: chatID }, { $pull: { participants: userID } });
+
     return res.status(204).json({ success: true, message: "Chat deleted!" });
   }
 
-  return res.status(401).json({ success: true, message: "Unauthorized!" });
+  return res.status(401).json({ success: false, message: "Unauthorized!" });
 };
 
 // SEND MESSAGE TO ANYONE
@@ -130,7 +122,7 @@ export const sendMessage = async (chatID: string, message: string, senderID: str
   const projectID = isProjectInvite ? new mongoose.Types.ObjectId(message) : null;
 
   const isBlocked = async (): Promise<boolean> => {
-    const chat = await Chats.findOne({ Id: chatID }, { participants: 1 });
+    const chat = await Chats.findOne({ _id: chatID }, { participants: 1, blocked: 1 });
 
     if (chat?.participants.length == 2 && chat.blocked == true) {
       return true;
@@ -139,14 +131,14 @@ export const sendMessage = async (chatID: string, message: string, senderID: str
     return false;
   }
 
-  if (await isBlocked()) throw new Error("You can't reply to this conversation anymore!");
+  if (await isBlocked()) throw new Error("You can't send messages to this chat anymore!");
 
   const sentMessage = await Messages.create({
     chatID,
     senderID,
     text: (isProjectInvite ? "Project Invitation" : message),
-    // Assigning a project id if its a project invitation.
-    ...(isProjectInvite && { project: projectID })
+    ...(isProjectInvite && { project: projectID }),
+    delivered: true
   });
 
   if (!sentMessage) throw new Error("Failed to send message!");

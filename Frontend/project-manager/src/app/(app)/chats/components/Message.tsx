@@ -12,13 +12,13 @@ interface Message {
 
 interface MessageProps {
   msg: Message
-  userID: string,
+  userID: string
 }
 
 const Message: React.FC<MessageProps> = ({ msg, userID }) => {
   return (
     <div
-      className={`flex ${msg.senderID === userID ? 'justify-end' : 'justify-start'} animate-in fade-in slide-in-from-bottom-2 duration-300`}
+      className={`flex ${msg.senderID === userID ? 'justify-end' : 'justify-start'} duration-300`}
     >
       <div
         className={`max-w-[80%] rounded-2xl px-4 py-2 relative shadow-sm ${msg.senderID === userID

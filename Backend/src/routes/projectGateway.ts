@@ -1,6 +1,6 @@
 import express from "express";
-import Projects from "../models/projectsModel";
-import routeHandler from "../middlewares/globalErrWrap";
+import Projects from "../models/projectsModel.js";
+import routeHandler from "../middlewares/globalErrWrap.js";
 const router = express.Router();
 
 //For viewing list of projects
@@ -11,14 +11,16 @@ router.get("/", routeHandler(async (req, res) => {
   const limit = req.query.view === "dashboard" ? 4 : 50;
 
   //Sending projects length according to the page view
-  const projects = await Projects.find({
-    members: userID
-  })
+  const projects = await Projects.find({ members: userID }, { members: 0 })
     .populate({
       path: "owner",
-      select: "fullname username"
+      select: "fullname"
     })
-    .limit(limit);
+    .populate({
+      path: "departments.head",
+      select: "fullname"
+    })
+    .limit(limit)
 
   if (!projects) throw Object.assign(new Error("No projects found!"), { status: 404 });
 
@@ -45,12 +47,12 @@ router.get("/:id", routeHandler(async (req, res) => {
     .populate({
       path: "owner",
       select: "fullname username"
-    }).lean();
+    })
 
   if (!project) throw Object.assign(new Error("Project not found !"), { status: 404 });
 
   const isOwner = project.owner?._id?.toString() === req.user.userID;
-  return res.status(200).json({ success: true, owner: isOwner, project: project });
+  return res.status(200).json({ success: true, isOwner: isOwner, project: project });
 }));
 
 //For Creating a Entirely New Project.
@@ -80,18 +82,15 @@ router.post("/", routeHandler(async (req, res) => {
 router.patch("/:id", routeHandler(async (req, res) => {
   if (!req.user) throw Object.assign(new Error("Please login/register first !"), { status: 400 })
 
-  const userId = req.user?.userID;
-  const projectId = req.params.id;
+  const userID = req.user?.userID
+  const projectId = req.params.id
+  const changes = req.body
 
-  const project = await Projects.findOne({
-    _id: projectId,
-    owner: userId,
-  });
+  const editedProject = await Projects.findOneAndUpdate({ _id: projectId, owner: userID }, { $set: changes });
 
-  if (!project) throw Object.assign(new Error("No Projects Found !"), { status: 404 })
+  if (!editedProject) throw Object.assign(new Error("Failed to save changes !"), { status: 400 });
 
-  // Will Construct According to frotend.
-  return res.status(200).json({ success: true, project });
+  return res.status(200).json({ success: true, message: "Changes Saved Successfully !" });
 }));
 
 //For Deleting a Project

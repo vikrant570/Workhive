@@ -115,7 +115,7 @@ const ConnectionsList: React.FC<props> = ({ connection, view, setRequestsLength 
 
     const getStylingClass = () => {
         if (view == 'home') {
-            return "border-ui-tertiary/20 border-2 px-4 py-3 rounded-xl bg-gradient-to-l from-ui-secondary to-buttons/5"
+            return "border-ui-tertiary/10 border-2 px-4 py-3 rounded-xl bg-gradient-to-l from-ui-secondary to-buttons/5"
         }
         else if (view == 'socials') {
             return "border-buttons/10 border-2 px-4 py-3 rounded-xl bg-gradient-to-r from-ui-tertiary/5 to-ui-secondary"

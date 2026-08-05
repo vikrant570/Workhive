@@ -1,6 +1,6 @@
-import { IOServer } from "../types/socket";
-import Chats from "../models/messaging/chatsModel";
-import { sendMessage } from "../controllers/chatsDBcontroller";
+import { IOServer } from "../types/socket.js";
+import Chats from "../models/messaging/chatsModel.js";
+import { createNewChat, sendMessage } from "../controllers/chatsDBcontroller.js";
 
 interface CallbackParams {
   status: string,
@@ -52,6 +52,49 @@ const chatController = (io: IOServer) => {
             code: "ERROR",
             message: error?.message || "Failed to send message!",
             _id: ""
+          });
+        }
+      }
+    });
+
+    socket.on("askReport", async (memberID, taskTitle, projectTitle, callback) => {
+      try {
+        let chat = await Chats.findOne({ p2pKey: [userID, memberID].sort().join("_") }, { _id: 1, participants: 1, blocked: 1 }).lean();
+
+        if (!chat) {
+          const newChat = await createNewChat([userID, memberID], true);
+          socket.join(String(newChat._id));
+          chat = newChat;
+        }
+
+        if (chat.blocked) {
+          callback({
+            status: "failed",
+            code: "BLOCKED"
+          })
+        }
+
+        const chatID = String(chat._id);
+        const msg = `Asking progress report for [${taskTitle}[ ongoing under the project | ${projectTitle}.`
+
+        const msgResponse = await sendMessage(chatID, msg, userID);
+
+        if (callback && msgResponse) {
+          callback({
+            status: "ok",
+            code: "SUCCESS"
+          });
+        }
+
+        socket.to(chatID).emit("messageReceived", msgResponse);
+        //Add push notification logic here later
+      }
+      catch (error: any) {
+        if (callback) {
+          callback({
+            status: "failed",
+            code: "ERROR",
+            message: error?.message || "Failed to send message!"
           });
         }
       }

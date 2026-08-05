@@ -4,8 +4,8 @@ import { useToastMsgContext } from "@/contexts/ToastMsgContext";
 import api from "@/lib/axios";
 import handleError from "@/utils/handleError";
 import Link from "next/link";
-import { Activity, useEffect, useRef, useState } from "react";
-import { LuSearch, LuArrowRight, LuX } from "react-icons/lu";
+import { Activity, useEffect, useState } from "react";
+import { LuSearch, LuArrowRight } from "react-icons/lu";
 import ConnectionsList from "../../../../components/ConnectionsList";
 
 interface userSocialsInterface {
@@ -43,7 +43,7 @@ const HomePageSocialsHandling = () => {
                     href="/auth"
                     className="group flex flex-col sm:flex-row items-center justify-center gap-3 w-full bg-ui-secondary rounded-3xl p-6 border border-ui-tertiary/20 shadow-md"
                 >
-                    <span className="bg-buttons text-texts-primary font-bold text-lg px-5 py-1.5 rounded-full border border-ui-secondary shadow-sm group-hover:scale-105 transition-transform duration-300 hover:bg-ui-main hover:border-buttons/80 ease-in-out hover:shadow-lg hover:text-buttons/80">
+                    <span className="bg-buttons text-texts-primary font-bold text-lg px-5 py-1.5 rounded-xl shadow-lg transition-colors duration-150 hover:bg-buttons/70 hover:shadow-buttons/10">
                         Login
                     </span>
                     <span className="text-texts-primary font-medium text-lg tracking-wide">
