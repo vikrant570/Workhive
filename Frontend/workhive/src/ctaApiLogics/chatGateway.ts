@@ -5,9 +5,7 @@ let socketInstance: ReturnType<typeof io> | null = null;
 
 const getSocket = () => {
   if (typeof window !== "undefined" && !socketInstance) {
-
-    const serverURL = process.env.NEXT_PUBLIC_BACKEND_URL;
-    if (!serverURL) process.exit(1);
+    const serverURL = process.env.NEXT_PUBLIC_BACKEND_URL
 
     const backend = serverURL?.replace("/manager", "") || "";
     //@ts-expect-error
