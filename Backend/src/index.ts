@@ -50,6 +50,7 @@ interface Error {
   status: number,
   message: string
 }
+
 app.use((err: Error, req: Request, res: Response, next: NextFunction) => {
   let errorMessage = err.message;
 

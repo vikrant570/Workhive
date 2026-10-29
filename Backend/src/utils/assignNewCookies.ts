@@ -1,72 +1,55 @@
-import { generateRefreshToken } from "./renewTokens.js";
-import { Response } from 'express';
+import { Response, Request } from 'express';
 import Tokens from "../models/auth/tokensModel.js";
 import jwt from 'jsonwebtoken';
-import { refreshTokenValidity } from "../middlewares/isLoggedIn.js";
-import { Types } from "mongoose";
+import { checkRefreshTokenAuthenticity } from '../middlewares/isLoggedIn.js';
+import { generateRefreshToken } from './renewTokens.js';
+
 
 // For Login and Register ---
-const assignCookiesOnAuth = async (res: Response, userID: string, email: string, action: string) => {
+const assignCookiesOnAuth = async (req: Request, res: Response, userID: string) => {
+  const secret = process.env.JWT_SECRET;
+  if (!secret) throw new Error("Unauthorised Access!");
+  const isProduction = process.env.NODE_ENV === "production";
 
-  const AccessToken = jwt.sign(
-    { userID: userID },
-    `${process.env.JWT_SECRET}`,
-    { expiresIn: "24hr" }
-  );
+  // getting refreshToken, whether we require new or old
+  const getRefreshToken = async (): Promise<string> => {
+    const tokenAlreadyExists = await Tokens.findOne({ userID: userID }, { token: 1 });
+    const prevTokn = tokenAlreadyExists?.token;
 
-  const decideRefreshTokenCreation = async (): Promise<"new" | "old"> => {
-    let decision: "new" | "old" = "old";
-
-    // New Tokens are must - [Registration]
-    if (action == "register") {
-      decision = "new";
-    }
-
-    // Check for existence as well as validity
-    else if (action == "login") {
-      const alreadyExists = await Tokens.findOne({ "refreshToken.userID": new Types.ObjectId(userID) });
-
-      if (!alreadyExists?.refreshToken || !alreadyExists.refreshToken.token) {
-        decision = "new";
-      } else {
-        const isValid = refreshTokenValidity(alreadyExists.refreshToken.token);
-
-        if (isValid == "generate") {
-          await Tokens.findOneAndDelete({ "refreshToken.userID": new Types.ObjectId(userID) });
-          decision = "new";
-        } else if (isValid == "no-op") {
-          decision = "old";
-        }
+    if (prevTokn) {
+      const isAuthentic = await checkRefreshTokenAuthenticity(prevTokn);
+      if (isAuthentic.valid && !isAuthentic.newRequired) {
+        return prevTokn;
+      }
+      else {
+        const newRefreshToken = generateRefreshToken(userID);
+        tokenAlreadyExists.token = newRefreshToken;
+        await tokenAlreadyExists.save();
+        return newRefreshToken;
       }
     }
 
-    return decision;
+    const newRefreshToken = generateRefreshToken(userID);
+    await Tokens.create({ userID: userID, token: newRefreshToken });
+    return newRefreshToken;
   }
 
-  const requirement = await decideRefreshTokenCreation();
+  const refreshToken = await getRefreshToken();
+  const accessToken = jwt.sign({ userID: userID }, secret, { expiresIn: "24h" });
 
-  const refreshingToken = await generateRefreshToken(userID, requirement);
-
-  // Cookie Config
-  const isProduction = process.env.NODE_ENV === "production";
-
-  if (!AccessToken || !refreshingToken) throw Object.assign(new Error("Failed To Authenticate !"), { status: 400 });
-
-  // Setting Access cookie
-  res.cookie("access", AccessToken, {
+  res.cookie("access", accessToken, {
     httpOnly: true,
-    maxAge: 1000 * 60 * 60 * 24, //24hrs
     sameSite: isProduction ? "none" : "lax",
     secure: isProduction,
+    maxAge: 1000 * 60 * 60 * 24
   });
 
-  //Setting Refreshing Token
-  res.cookie("refresh", refreshingToken.token, {
+  res.cookie("refresh", refreshToken, {
     httpOnly: true,
-    maxAge: 1000 * refreshingToken.age, // Age of token residing in database OR 30d if new token
     sameSite: isProduction ? "none" : "lax",
     secure: isProduction,
-  });
+    maxAge: 1000 * 60 * 60 * 24 * 30
+  })
 };
 
 export default assignCookiesOnAuth;

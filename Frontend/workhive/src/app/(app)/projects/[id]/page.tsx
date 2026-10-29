@@ -1,14 +1,13 @@
 import {
-   LuCalendar, LuCircle, LuCircleAlert, LuCircleCheck,
-   LuClock, LuDownload, LuEllipsisVertical, LuFileText,
-   LuFlag, LuImage, LuPaperclip, LuUser, LuUsers, LuPencilLine
+   LuCalendar, LuChevronDown, LuCircleCheck, LuDownload,
+   LuFlag, LuPaperclip, LuUser, LuUsers,
 } from "react-icons/lu";
 
 //Imports 
 import { parseDate } from "@/utils/dateTimeFormatter";
 import ConnectionsList from "@/components/ConnectionsList";
 import { fetchSingleProject_server } from "@/lib/fetchData.server";
-import { EditORViewAccess, TaskEllipsesDropDown } from "../components/CtaProjectBtns";
+import { EditORViewAccess, TaskEllipsesDropDown } from "../components/viewer/CtaProjectBtns";
 import FullContentError from "@/components/global_compns/FullContentError";
 import { getAttachmentIcon, getStatusBadge } from "@/utils/otherUItools";
 
@@ -43,10 +42,11 @@ export interface Project {
    tasks: Task[];
    attachments: string[];
    status: "Completed" | "Cancelled" | "In progress";
-   departments?: {
+   departments?: Array<{
       name: string,
       head: Omit<partialUserInfo, "username">
-   }
+   }>,
+   chatRoom: string
    progress: number
 }
 interface SingleProjectRes {
@@ -56,9 +56,14 @@ interface SingleProjectRes {
    message?: string
 }
 
-export default async function ProjectDisplay({ params, searchParams }: { params: Promise<{ id: string }>, searchParams: Promise<{ isOwner: string, isInvite?: string }> }) {
+interface Invite {
+   inviteStatus: "Accepted" | "Pending",
+   inviteID: string
+}
+
+export default async function ProjectDisplay({ params, searchParams }: { params: Promise<{ id: string }>, searchParams: Promise<Invite> }) {
    const { id } = await params;
-   const { isInvite } = await searchParams;
+   const { inviteStatus, inviteID } = await searchParams;
 
    let project: Project;
 
@@ -72,7 +77,7 @@ export default async function ProjectDisplay({ params, searchParams }: { params:
 
    return (
       <div className="min-h-screen bg-ui-main p-8 ml-55 text-texts-primary font-sans">
-         {/* 1. Header Section */}
+         {/* Header Section */}
          <div className="mb-8">
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                {/* -- Page Header -- */}
@@ -91,13 +96,11 @@ export default async function ProjectDisplay({ params, searchParams }: { params:
                </div>
 
                {/* -- Call To Action Button - (Edit / Accpet / Null) -- */}
-               <EditORViewAccess type={data.isOwner === true ? "ownerView" : (isInvite === "1" ? "invite" : "none")} projectId={id} />
-
+               <EditORViewAccess type={data.isOwner === true ? "ownerView" : (inviteStatus ? "invite" : "none")} projectId={id} inviteStatus={inviteStatus || undefined} inviteID={inviteID} />
             </div>
             <div className="h-0.5 w-full bg-gradient-to-r from-buttons to-transparent mt-6 opacity-50"></div>
          </div>
 
-         {/* 2. Key Metrics Grid */}
          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
             {/* Owner Card */}
             <div className="bg-ui-secondary p-5 rounded-2xl border border-ui-tertiary/10 flex items-center gap-4">
@@ -142,70 +145,57 @@ export default async function ProjectDisplay({ params, searchParams }: { params:
             </div>
          </div>
 
-         {/* 3. Main Content Grid */}
-         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 mb-8">
-
-            {/* Left Column: Tasks (Spans 2 cols) */}
-            <div className="lg:col-span-2 h-full">
-               <div className="bg-ui-secondary rounded-3xl p-6 border border-ui-tertiary/10 h-full flex flex-col">
-                  <div className="flex justify-between items-center mb-6 shrink-0">
-                     <h2 className="text-xl font-bold flex items-center gap-2">
-                        <LuCircleCheck size={20} className="text-buttons" /> Project Tasks
-                     </h2>
-                     <span className="bg-ui-main text-xs font-bold px-2 py-1 rounded-md text-texts-secondary border border-ui-tertiary/10">
-                        {project?.tasks.length} Total
-                     </span>
-                  </div>
-
-                  <div className="space-y-3 max-h-[400px] overflow-y-auto pr-2 custom-scrollbar">
-                     {project?.tasks.map((task, i) => (
-                        <div key={i} className={`relative p-4 rounded-2xl border transition-colors flex items-center justify-between group ${task.status === 'Cancelled' ? 'bg-ui-main/30 border-transparent opacity-60' : 'bg-ui-main border-ui-tertiary/5 hover:border-buttons/30'
-                           }`}>
-                           <div className="flex items-center gap-4">
-                              <div className={`w-2 h-2 rounded-full ${task.status === 'Completed' ? 'bg-green-500' : task.status === 'In Progress' ? 'bg-blue-500' : 'bg-ui-tertiary'}`}></div>
-                              <div>
-                                 <p className={`font-medium ${task.status === 'Cancelled' ? 'line-through text-texts-secondary' : 'text-texts-primary'}`}>
-                                    {task.title}
-                                 </p>
-                                 <p className="text-xs text-texts-secondary flex items-center gap-1 mt-0.5">
-                                    <LuUser size={10} /> {task.assignedTo.fullname}
-                                 </p>
-                              </div>
-                           </div>
-                           <div className="flex items-center gap-4">
-                              {getStatusBadge(task.status)}
-                              {data.isOwner && <TaskEllipsesDropDown projectTitle={project.title} projectOwner={project.owner._id} projectTask={task} />}
+         {/* Tasks Tab*/}
+         <div className="w-full">
+            <div className="bg-ui-secondary rounded-3xl p-6 border border-ui-tertiary/10 h-full flex flex-col">
+               <div className="flex justify-between items-center mb-6 shrink-0">
+                  <h2 className="text-xl font-bold flex items-center gap-2">
+                     <LuCircleCheck size={20} className="text-buttons" /> Project Tasks
+                  </h2>
+                  <span className="bg-ui-main text-xs font-bold px-2 py-1 rounded-md text-texts-secondary border border-ui-tertiary/10">
+                     Total {project.tasks?.length}
+                  </span>
+               </div>
+               <div className="space-y-3 max-h-[400px] overflow-y-auto pr-2 custom-scrollbar">
+                  {project.tasks.map((task) => (
+                     <div key={task._id} className={`relative p-4 rounded-2xl border transition-colors flex items-center justify-between group ${task.status === 'Cancelled' ? 'bg-ui-main/30 border-transparent opacity-60' : 'bg-ui-main border-ui-tertiary/5 hover:border-buttons/30'
+                        }`}>
+                        <div className="flex items-center gap-4">
+                           <div className={`w-2 h-2 rounded-full ${task.status === 'Completed' ? 'bg-green-500' : task.status === 'In Progress' ? 'bg-blue-500' : 'bg-ui-tertiary'}`}></div>
+                           <div>
+                              <p className={`font-medium ${task.status === 'Cancelled' ? 'line-through text-texts-secondary' : 'text-texts-primary'}`}>
+                                 {task.title}
+                              </p>
+                              <p className="text-xs text-texts-secondary flex items-center gap-1 mt-0.5">
+                                 <LuUser size={10} /> {task.assignedTo.fullname}
+                              </p>
                            </div>
                         </div>
-                     ))}
-                  </div>
+                        <div className={`bg-gradient-to-br from-ui-tertiary/10 to-ui-main px-3 py-2 rounded-xl border-ui-tertiary border ${task?.department ? "hover:bg-ui-secondary duration-150 transition-colors" : ""}`}>
+                           {
+                              task?.department ?
+                                 <>
+                                    <h1 className="text-md text-texts-primary">{task.department}</h1>
+                                    <p className="text-xs text-texts-secondary">{project.departments?.find(d => d.name === task.department)?.head.fullname}</p>
+                                 </>
+                                 :
+                                 <h1 className="text-md text-texts-secondary">No Department</h1>
+                           }
+                        </div>
+                        <div className="flex items-center gap-4">
+                           {getStatusBadge(task.status)}
+                           {data.isOwner && <TaskEllipsesDropDown projectTitle={project.title} projectOwner={project.owner._id} projectTask={task} view="Project" />}
+                        </div>
+                     </div>
+                  ))}
                </div>
             </div>
+         </div >
 
-            {/* Right Column: Members (Now Full Height of Row) */}
-            <div className="lg:col-span-1 h-full">
 
-               {/* Team Members */}
-               <div className="bg-ui-secondary rounded-3xl p-6 border border-ui-tertiary/10 h-full flex flex-col">
-                  <h2 className="text-xl font-bold flex items-center gap-2 mb-6 shrink-0">
-                     <LuUsers size={20} className="text-purple-400" /> Team Members
-                  </h2>
-                  {/* Added max-h-[400px] to match tasks tab height limit and overflow-y-auto for scrolling */}
-                  <div className="space-y-4 flex-1 overflow-y-auto pr-2 custom-scrollbar max-h-[400px]">
-                     {/* Dynamic Connections List */}
-                     {project.members.map(((connection) => (
-                        <ConnectionsList connection={connection} view='project_view' key={connection._id} />
-                     )))}
-                  </div>
-               </div>
-
-            </div>
-
-         </div>
-
-         {/* 4. Bottom Section: Attachments */}
-         <div className="w-full">
-            <div className="bg-ui-secondary rounded-3xl p-6 border border-ui-tertiary/10">
+         {/* Attachments and members */}
+         <div className="w-full grid grid-cols-6">
+            <div className="bg-ui-secondary rounded-3xl p-6 border border-ui-tertiary/10 md:col-span-4">
                <div className="flex justify-between items-center mb-6">
                   <h2 className="text-xl font-bold flex items-center gap-2">
                      <LuPaperclip size={20} className="text-blue-400" /> Attachments
@@ -235,6 +225,20 @@ export default async function ProjectDisplay({ params, searchParams }: { params:
                      ))}
                   </div>
                )}
+            </div>
+
+            {/* Team Members */}
+            <div className="bg-ui-secondary rounded-3xl p-6 border border-ui-tertiary/10 h-full flex flex-co md:col-span-2">
+               <h2 className="text-xl font-bold flex items-center gap-2 mb-6 shrink-0">
+                  <LuUsers size={20} className="text-purple-400" /> Team Members
+               </h2>
+               {/* Added max-h-[400px] to match tasks tab height limit and overflow-y-auto for scrolling */}
+               <div className="space-y-4 flex-1 overflow-y-auto pr-2 custom-scrollbar max-h-[400px]">
+                  {/* Dynamic Connections List */}
+                  {project.members.map(((connection) => (
+                     <ConnectionsList connection={connection} view='project_view' key={connection._id} />
+                  )))}
+               </div>
             </div>
          </div>
       </div>

@@ -5,6 +5,8 @@ import { ToastMsgProvider } from '@/contexts/ToastMsgContext';
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import ToastNotification from '@/components/global_compns/ToastNotification';
+import MessageNotification from '@/components/global_compns/MessageNotification';
+import CreateProjectButton from '@/components/global_compns/CreateProjectButton';
 
 
 const geistSans = Geist({
@@ -31,6 +33,8 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
                 <ToastMsgProvider>
                     <ToastNotification />
                     <MessageContextProvider>
+                        <CreateProjectButton />
+                        <MessageNotification />
                         {children}
                     </MessageContextProvider>
                 </ToastMsgProvider>

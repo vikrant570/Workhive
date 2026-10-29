@@ -4,19 +4,16 @@ import { getStatusBadge } from "@/utils/otherUItools"
 import Link from "next/link"
 import { LuUsers, LuClock, } from "react-icons/lu"
 
-interface ProjectProp {
-    projects: Omit<Project, "tasks" | "members">[],
+interface CardProps {
+    projects: Omit<Project, "tasks" | "members">[]
 }
 
-export default async function ProjectsList({ projects }: ProjectProp) {
+export default async function SmProjectsList({ projects }: CardProps) {
     return (
         <>
             {projects.map((project, key) => (
                 <Link href={`/projects/${project._id}`} className="p-0 m-0" key={key}>
-                    <div key={key} className={
-                        `bg-${projects.length > 4 ? 'gradient-to-r from-ui-secondary to-ui-tertiary/5' : 'ui-main'} 
-                        p-4 my-3 rounded-2xl border border-ui-tertiary/5 hover:border-buttons/20 transition-colors group w-full`
-                    }>
+                    <div key={key} className="bg-gradient-to-br from-buttons/5 to-indigo-500/5 p-4 my-3 rounded-2xl border border-ui-tertiary/5 hover:border-buttons/20 transition-colors group w-full">
                         <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-3 gap-2">
                             <div>
                                 <h3 className="font-bold text-lg group-hover:text-buttons transition-colors">{project.title}</h3>

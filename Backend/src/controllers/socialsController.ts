@@ -10,7 +10,7 @@ export const sendConnectionRequest = async (
 
   const response1 = await userSocials.findOneAndUpdate(
     { user: userToBeActedUpon },
-    { $addToSet: { connectionRequests: userID } }
+    { $addToSet: { connectionRequests: userID }, $inc: { "notifications.socials": 1 } }
   );
 
   const response2 = await userSocials.findOneAndUpdate(
@@ -37,7 +37,8 @@ export const acceptConnectionRequest = async (
     { user: userToBeActedUpon },
     {
       $pull: { sentConnectionRequests: userID },
-      $addToSet: { connections: userID }
+      $addToSet: { connections: userID },
+      $inc: { "notifications.socials": 1 }
     }
   )
 
@@ -108,12 +109,7 @@ export const blockConnection = async (
   )
 
   // Set the chat status to blocked too
-  const chat = await Chats.findOne({ p2pKey: [String(userID), String(userToBeActedUpon)].sort().join("_") })
-
-  if (chat) {
-    chat.blocked = true;
-    await chat.save();
-  }
+  await Chats.findOneAndUpdate({ p2pKey: [String(userID), String(userToBeActedUpon)].sort().join("_") }, { $set: { blocked: true } })
 
   if (!response1 || !response2) throw new Error("Unable to process your request");
 };

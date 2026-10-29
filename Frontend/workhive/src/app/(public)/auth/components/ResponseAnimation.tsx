@@ -29,7 +29,7 @@ const ResponseAnimation: React.FC<Props> = ({ authSuccess, afterAuthMsg }) => {
       >
         {afterAuthMsg}
       </p>
-      <a className="flex items-center text-buttons underline underline-offset-2 hover:text-texts-primary ease-in-out hover:scale-101 duration-150 text-md mt-2" href="/">
+      <a className="flex items-center text-buttons underline underline-offset-2 hover:text-texts-secondary ease-in-out hover:scale-101 duration-150 text-md mt-2" href="/home">
         Click To Continue <LuArrowRight size={15} />
       </a>
     </div>

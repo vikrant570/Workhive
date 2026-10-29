@@ -3,7 +3,7 @@ import io from "socket.io-client";
 
 let socketInstance: ReturnType<typeof io> | null = null;
 
-const getSocket = () => {
+export const getSocket = () => {
   if (typeof window !== "undefined" && !socketInstance) {
     const serverURL = process.env.NEXT_PUBLIC_BACKEND_URL
 
@@ -24,24 +24,24 @@ export interface socketRes {
 }
 
 //Sending Message TO Someone
-export const sendMessage = async (chatID: string, message: string): Promise<{ success: boolean, _id: string }> => {
+export const sendMessage = async (type: "p2p" | "group", chatID: string, message: string): Promise<{ success: boolean, _id: string }> => {
   if (!socket) throw new Error("Unable To Connect To The Server! Try Again Later");
 
   return new Promise((resolve) => {
-    socket.emit("sendMessage", chatID, message, (response: socketRes) => {
+    socket.emit("sendMessage", type, chatID, message, (response: socketRes) => {
       resolve({ success: response.status == "ok", _id: response._id });
     });
   })
 }
 
-export const createNewChat = async (connectionIDs: string[], query: string) => {
-  const response = await api.post(`/chats/create?projectSetup=${query}`, { connectionIDs }, { withCredentials: true });
+export const createNewChat = async (connectionIDs: string[], group?: { name: string, admin: string }) => {
+  const response = await api.post("/chats/create", { connectionIDs, groupName: group?.name || undefined }, { withCredentials: true });
   return response.data.newChat;
 }
 
 interface Chat {
   _id: string,
-  participants: Array<{ _id: string }>
+  participants: Array<string>
 }
 
 interface chatRes {
@@ -50,15 +50,15 @@ interface chatRes {
 }
 
 // Final Action: Sends Invites
-const sendInvites = async (allChats: Chat[], projectID: string) => {
+const sendInvites = async (chats: Chat[], projectID: string) => {
   if (!socket) throw new Error("Unable To Connect To The Server! Try Again Later");
+
   try {
     await Promise.all(
-      allChats.map((c) => {
+      chats.map((chat) => {
         // Waiting For Acknowledgement For Every Invitation Sent Successfully
         return new Promise((resolve, reject) => {
-
-          socket.emit("sendMessage", c._id, projectID, (response: socketRes) => {
+          socket.emit("sendMessage", "p2p", chat.participants[0], projectID, (response: socketRes) => {
             if (response.status === "ok") {
               resolve(response);
             } else {
@@ -74,10 +74,10 @@ const sendInvites = async (allChats: Chat[], projectID: string) => {
   }
 }
 
-export const inviteMembers = async (participants: Array<{ _id: string }>, projectID: string) => {
+export const inviteMembers = async (participants: Array<{ _id: string }>, projectID: string, group: { name: string, admin: string }) => {
   try {
     // Getting all chats for sending invites
-    const res = await api.post("/chats?projectSetup=1", { participants: participants }, { withCredentials: true });
+    const res = await api.post("/chats", { participants: participants, group: group || undefined }, { withCredentials: true });
     if (!res.data.success) return false;
 
     const chats = (res.data as chatRes).myChats;
@@ -88,17 +88,17 @@ export const inviteMembers = async (participants: Array<{ _id: string }>, projec
     }
 
     // Logic to create new chats which doesn't exist ---
-    const existingChatParticipants = new Set(chats.map(chat => chat.participants[0]._id));
+    const existingChatParticipants = new Set(chats.map(chat => chat.participants[0]));
 
-    const remainingInvitees = participants.map(elem => {
-      const exists = existingChatParticipants.has(elem._id);
-      if (!exists) return elem._id;
+    const remainingInvitees = participants.map(p => {
+      const exists = existingChatParticipants.has(p._id);
+      if (!exists) return p._id;
     })
 
     await Promise.all(
       remainingInvitees.map(async (inviteeID) => {
         if (inviteeID) {
-          const newChat: Chat = await createNewChat([inviteeID], "1");
+          const newChat: Chat = await createNewChat([inviteeID], undefined);
           if (!newChat) return new Error("Something Went Wrong! Can't Send Invite.")
           chats.push(newChat)
         }

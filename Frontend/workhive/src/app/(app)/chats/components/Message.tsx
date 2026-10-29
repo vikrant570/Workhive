@@ -1,24 +1,17 @@
 import { parseDate } from "@/utils/dateTimeFormatter";
 import { IoCheckmarkDoneOutline } from "react-icons/io5";
-
-interface Message {
-  _id: string,
-  senderID: string,
-  chatID: string,
-  text: string,
-  delivered: boolean,
-  createdAt: string
-}
+import { Msg } from "../page";
 
 interface MessageProps {
-  msg: Message
+  msg: Msg
   userID: string
+  align: "start" | "end"
 }
 
-const Message: React.FC<MessageProps> = ({ msg, userID }) => {
+const Message: React.FC<MessageProps> = ({ msg, userID, align }) => {
   return (
     <div
-      className={`flex ${msg.senderID === userID ? 'justify-end' : 'justify-start'} duration-300`}
+      className={`flex justify-${align} duration-300`}
     >
       <div
         className={`max-w-[80%] rounded-2xl px-4 py-2 relative shadow-sm ${msg.senderID === userID

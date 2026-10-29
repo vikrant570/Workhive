@@ -8,23 +8,58 @@ import {
   LuMail,
   LuFolderOpen,
   LuBell,
-  LuUser,
   LuHouse,
   LuHexagon,
   LuUsers
 } from "react-icons/lu";
+import { useEffect, useState } from "react";
+import api from "@/lib/axios";
 
 const UserSidebar = () => {
   const { user } = useUserContext();
+  const [notifications, setNotifications] = useState<{ socials: number, messages: number } | null>(null);
+
+  useEffect(() => {
+    async function fetchNotifications() {
+      const res = await api.get("/socials/notifications", { withCredentials: true });
+      if (!res || !res.data.success) return;
+      setNotifications(res.data.notifications);
+    }
+    fetchNotifications();
+  }, [])
 
   const navLinks = [
     { name: "Home", icon: <LuHouse size={18} />, href: "/" },
-    { name: "Dashboard", icon: <LuChartBar size={18} />, href: "/dashboard" },
-    { name: "My Projects", icon: <LuFolderOpen size={18} />, href: "/projects" },
-    { name: "Chats", icon: <LuMail size={18} />, href: "/chats" },
-    { name: "Notifications", icon: <LuBell size={18} />, href: "/notifications" },
-    { name: "Socials", icon: <LuUsers size={18} />, href: "/socials" }
+    { name: "Dashboard", icon: <LuChartBar size={18} />, href: "dashboard" },
+    { name: "My Projects", icon: <LuFolderOpen size={18} />, href: "projects" },
+    { name: "Chats", icon: <LuMail size={18} />, href: "chats" },
+    { name: "Notifications", icon: <LuBell size={18} />, href: "notifications" },
+    { name: "Socials", icon: <LuUsers size={18} />, href: "socials" }
   ];
+
+  const resetNotificationCount = (path: string) => {
+    if (path == "socials" || path == "chats") {
+      const key = path == "chats" ? "messages" : "socials";
+      if (notifications?.[key] == 0 || !notifications) return;
+
+      setNotifications(prev => prev && {
+        ...prev,
+        [key]: 0
+      });
+    }
+  }
+  const notificationsCountRead = (path: string) => {
+    if (path == "chats" || path == "socials") {
+      const key = path == "chats" ? "messages" : "socials";
+      if (notifications && notifications[key] > 0) {
+        return (
+          <div className="absolute bottom-1 -right-9 px-1 py-0 text-texts-primary text-xs bg-red-500/90 rounded-full">
+            {notifications[key]}{notifications[key] > 9 ? "+" : ""}
+          </div>)
+      }
+    }
+    return null
+  }
 
   return (
     <div className="h-full fixed left-0 top-0 bg-ui-secondary w-50 flex flex-col border-r border-ui-tertiary/10 shadow-xl z-50">
@@ -37,16 +72,20 @@ const UserSidebar = () => {
 
       {/* 2. Navigation Links - Clean list with hover effects */}
       <div className="flex-1 flex flex-col gap-2 px-3 overflow-y-auto">
-        {navLinks.map((link) => (
+        {notifications && navLinks.map((link) => (
           <Link
             key={link.name}
-            href={link.href}
+            href={`/${link.href}`}
+            onClick={() => resetNotificationCount(link.href)}
             className="group flex items-center gap-3 px-4 py-3 text-texts-secondary rounded-xl hover:bg-ui-main hover:text-white transition-all duration-200 ease-in-out"
           >
             <span className="text-buttons opacity-80 group-hover:opacity-100 group-hover:scale-110 transition-transform duration-200">
               {link.icon}
             </span>
-            <span className="font-medium text-sm">{link.name}</span>
+            <span className="font-medium text-sm relative">
+              {link.name}
+              {notificationsCountRead(link.href)}
+            </span>
           </Link>
         ))}
       </div>

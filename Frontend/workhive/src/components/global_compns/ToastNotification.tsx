@@ -34,7 +34,7 @@ export default function ToastNotification() {
           className={`flex items-center shadow-xl w-auto transition-colors ${isInfo
             ? 'bg-ui-tertiary/95 text-ui-main px-3 py-2 rounded-xl shadow-ui-tertiary/15 gap-2 max-w-sm'
             : isSuccess
-              ? 'bg-green-500/85 text-ui-main px-4 py-3 rounded-2xl shadow-green-500/10 gap-3 max-w-md'
+              ? 'bg-green-500/90 text-ui-main px-4 py-3 rounded-2xl shadow-green-500/10 gap-3 max-w-md'
               : 'bg-alerts/95 text-texts-primary px-4 py-3 rounded-2xl shadow-alerts/20 gap-3 max-w-md'
             }`}
         >

@@ -5,30 +5,27 @@ import { FaPaperclip } from "react-icons/fa6";
 import { IoMdMore, IoIosSend } from "react-icons/io";
 import { RxCross2 } from "react-icons/rx";
 import { CgSpinner } from "react-icons/cg";
+import { LuRefreshCcw } from "react-icons/lu";
 // COMPONENTS
 import Message from "./Message";
+import ProjectInviteCard from "./ProjectInviteCard";
 // API(s)
-import { useUserContext } from "@/contexts/UserContext";
 import api from "@/lib/axios";
 import { sendMessage } from "@/ctaApiLogics/chatGateway";
-import ProjectInviteCard from "./ProjectInviteCard";
-import { useToastMsgContext } from "@/contexts/ToastMsgContext";
+// CONTEXT AND HELPERS
 import handleError from "@/utils/handleError";
-import { LuRefreshCcw } from "react-icons/lu";
+import { useUserContext } from "@/contexts/UserContext";
+import { useToastMsgContext } from "@/contexts/ToastMsgContext";
+import { selectRandomBg } from "@/utils/nameInitials";
 
-// Type definition for a single message
+//Interfaces
+import { Msg } from "../page";
+import AskProgressReportCard from "./AskProgressReportCard";
+
 interface Res {
   success: boolean,
   messages: Array<any>,
   hasMore?: boolean
-}
-interface Msg {
-  _id: string,
-  senderID: string,
-  chatID: string,
-  text: string,
-  delivered: boolean,
-  createdAt: string
 }
 
 interface ProjectInvite extends Msg {
@@ -42,13 +39,14 @@ interface ProjectInvite extends Msg {
 
 interface ChatProps {
   chatID: string;
-  chatName: string;
   setChatOpen: React.Dispatch<React.SetStateAction<boolean>>;
   setInteraction: React.Dispatch<React.SetStateAction<Msg | null>>;
   interaction: Msg | null;
+  currentChat: { recipientKey: string, chatName: string } | null;
 }
 
-const ChatInterface: React.FC<ChatProps> = ({ chatID, chatName, setChatOpen, setInteraction, interaction }) => {
+const ChatInterface: React.FC<ChatProps> = ({ chatID, currentChat, setChatOpen, setInteraction, interaction }) => {
+  if (!currentChat) return null;
   // Sending Message States
   const [sending, setSending] = useState<boolean>(false);
   const [loading, setLoading] = useState<boolean>(false);
@@ -62,7 +60,9 @@ const ChatInterface: React.FC<ChatProps> = ({ chatID, chatName, setChatOpen, set
   const { user } = useUserContext();
   const { showToastMsg } = useToastMsgContext();
 
+  //Extras
   const [error, setError] = useState<string>("");
+  const isGroupChat = currentChat.recipientKey === chatID;
 
   // Element References
   const mainContainerRef = useRef<HTMLElement | null>(null);
@@ -84,38 +84,75 @@ const ChatInterface: React.FC<ChatProps> = ({ chatID, chatName, setChatOpen, set
   // Top Most Message Pointer
   const [cursor, setCursor] = useState<string>("")
 
-  // Message Fetching Function
-  const fetchMessages = useCallback(async (cursor: string) => {
-    if (isFirstLoad.current) isFirstLoad.current = false;
+  // Reset everything and fetch fresh messages when chatID changes
+  useEffect(() => {
+    if (!chatID) return;
+
+    setMessages([]);
+    setCursor("");
+    setHasMore(true);
+    isFirstLoad.current = true;
+    prevMessagesHeight.current = 0;
+    setError("");
+
+    // Fetch the first page of messages for the new chat
+    const fetchInitial = async () => {
+      try {
+        setLoading(true);
+        const res = await api.get(`/chats/${chatID}?cursor=`, { withCredentials: true });
+
+        if (!res.data.success && res.data.message == "Chat Doesn't Exist!") return;
+        const msgs = (res.data as Res).messages;
+
+        setMessages(msgs);
+        setHasMore(res.data.hasMore);
+
+        if (msgs?.length > 0) setCursor((msgs[0] as Msg)?._id);
+
+        // Scroll to bottom on first load
+        setTimeout(() => {
+          messagesEndRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
+        }, 100);
+      }
+      catch (err) {
+        setError(handleError(err, "axios") as string);
+      }
+      finally {
+        setLoading(false);
+        isFirstLoad.current = false;
+      }
+    };
+
+    fetchInitial();
+  }, [chatID]);
+
+  // Message Fetching Function - Pagination
+  const fetchMessages = useCallback(async (paginationCursor: string) => {
+    if (!paginationCursor) return;
+
     try {
       setLoading(true);
-      const res = await api.get(`/chats/${chatID}?cursor=${cursor}`, { withCredentials: true });
+      const res = await api.get(`/chats/${chatID}?cursor=${paginationCursor}`, { withCredentials: true });
 
       if (!res.data.success && res.data.message == "Chat Doesn't Exist!") return;
       const msgs = (res.data as Res).messages;
-      console.log(msgs[0]);
 
       setMessages((prev) => [...msgs, ...prev]);
       setHasMore(res.data.hasMore)
 
       // Setting The Cursor To The TopMost Message
       if (msgs?.length > 0) setCursor((msgs[0] as Msg)?._id);
-
-      messagesEndRef.current?.scrollTo({ behavior: "smooth" });
     }
     catch (err) {
       setError(handleError(err, "axios") as string);
     }
     finally {
       setLoading(false);
-      return;
     }
   }, [chatID])
 
-
   //Oberver - Triggering Fetch
   useEffect(() => {
-
     const observer = new IntersectionObserver((entries) => {
       const entry = entries[0];
       if (entry.isIntersecting && !loadingRef.current && hasMoreRef.current) {
@@ -141,28 +178,34 @@ const ChatInterface: React.FC<ChatProps> = ({ chatID, chatName, setChatOpen, set
     }
   }, [messages]);
 
-  // Reset Everything When Switching Between Chats
-  useEffect(() => {
-    isFirstLoad.current == true;
-    setMessages([]);
-    setCursor("");
-    setHasMore(true);
-    prevMessagesHeight.current = 0;
-  }, [chatName, chatID]);
-
   //Listening For New Messages -> MsgNotificationContext
   useEffect(() => {
-    if (!interaction) return;
+    if (!interaction?.text || !interaction?._id) return;
+
     setMessages((prev) => {
-      const exists = messages[prev.length - 1];
-      return (exists?._id !== interaction?._id ? [...prev, interaction] : prev)
+      const exists = messages[prev.length - 1]?._id === interaction?._id;
+
+      if (exists) {
+        return prev;
+      }
+      else {
+        messagesEndRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
+        return [...prev, interaction]
+      }
     });
+
+    return () => {
+      if (chatID !== "") {
+        api.patch("/chats/resetUnreadCount", { chatID: chatID }, { withCredentials: true })
+      }
+    }
   }, [interaction]);
 
   // Sending a message
   const handleSendMessage = useCallback(async (inputValue: string) => {
     setSending(true);
-    const res = await sendMessage(chatID, inputValue!.trim());
+    const type = isGroupChat ? "group" : "p2p";
+    const res = await sendMessage(type, currentChat?.recipientKey, inputValue!.trim());
 
     if (!res.success) {
       showToastMsg({ text: "Failed to send message!", type: "error" });
@@ -181,16 +224,31 @@ const ChatInterface: React.FC<ChatProps> = ({ chatID, chatName, setChatOpen, set
 
       setInteraction(messageSent);
       setMessages((prev) => [...prev, messageSent]);
-      messagesEndRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
 
       setInputValue(null);
     }
     setSending(false);
   }, [chatID])
 
+  // Decide MEssage Component To Render
+  const decideMsgCompn = (msg: any) => {
+    if (!user) return null;
+    const align = (msg as Msg).senderID === user._id ? "end" : "start";
+
+    if (msg.inviteStatus) {
+      return <ProjectInviteCard invite={(msg as ProjectInvite)} userID={user._id} key={msg._id} align={align} />
+    }
+    else if (msg.reportStatus) {
+      return <AskProgressReportCard projectID={msg.project._id} messageID={msg._id} key={msg._id} align={align} reportStatus={msg.reportStatus} />
+    }
+    else {
+      return <Message msg={msg} key={msg._id} userID={user?._id} align={align} />
+    }
+  }
+
   if (error !== "") {
     return (
-      <div className="w-3xl mx-0 border-ui-tertiary/40 h-full py-10 px-3">
+      <div className="w-3xl mx-0 border-ui-tertiary/40 h-full py-10 px-3 ">
         <div className="max-w-10/12 rounded-3xl shadow-xs shadow-texts-important/ text-center">
           <h1 className="text-xl text-texts-primary font-bold "> Ooops ! </h1>
           <p className="text-sm text-alerts mb-2">{error}</p>
@@ -215,17 +273,21 @@ const ChatInterface: React.FC<ChatProps> = ({ chatID, chatName, setChatOpen, set
       <header className="flex items-center justify-between px-4 py-3 bg-ui-secondary shadow-xl shadow-black/30 sticky top-0 z-10">
         <div className="flex items-center gap-3">
           <div className="relative">
-            <div className="w-10 h-10 rounded-full bg-buttons/70 flex items-center justify-center font-bold text-white text-sm">
-              {chatName[0]}
+            <div className={`w-10 h-10 rounded-full flex items-center justify-center font-bold text-white text-sm ${isGroupChat ? 'bg-ui-tertiary/80' : selectRandomBg(currentChat.chatName)}`}>
+              {currentChat?.chatName[0]}
             </div>
-            <div className="absolute bottom-0 right-0 w-3 h-3 bg-green-500 border-2 border-ui-tertiary/15 rounded-full"></div>
+            {!isGroupChat && <div className="absolute bottom-0 right-0 w-3 h-3 bg-green-500 border-2 border-ui-tertiary/15 rounded-full"></div>}
           </div>
           <div>
-            <h2 className="font-semibold text-sm">{chatName}</h2>
-            <p className="text-xs text-green-400 font-medium tracking-wide">
-              {/* Will add the online/offline logic later */}
-              ONLINE
-            </p>
+            <h2 className="font-semibold text-sm">{currentChat?.chatName}</h2>
+            {
+              isGroupChat
+                ? null :
+                <p className="text-xs text-green-400 font-medium tracking-wide">
+                  {/* Will add the online/offline logic later 054 */}
+                  ONLINE
+                </p>
+            }
           </div>
         </div>
 
@@ -250,10 +312,8 @@ const ChatInterface: React.FC<ChatProps> = ({ chatID, chatName, setChatOpen, set
 
           {
             user && messages && messages.map(
-              (msg, i) => (
-                (msg as ProjectInvite)?.project?._id ?
-                  <ProjectInviteCard invite={(msg as ProjectInvite)} userID={user._id} key={msg._id} /> :
-                  <Message msg={msg} key={msg._id + String(i)} userID={user?._id} />
+              (msg) => (
+                decideMsgCompn(msg)
               )
             )
           }
@@ -281,13 +341,13 @@ const ChatInterface: React.FC<ChatProps> = ({ chatID, chatName, setChatOpen, set
             value={inputValue || ""}
             className="flex-1 bg-transparent border-none outline-none text-sm py-1 px-2 text-texts-primary placeholder:text-texts-secondary"
             onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
-              setInputValue(e.target.value)
+              setInputValue(e.target.value !== "" ? e.target.value : null)
             }
           />
           <button
             onClick={() => { inputValue && handleSendMessage(inputValue) }}
-            disabled={!inputValue?.trim()}
-            className={`p-2 rounded-full transition-all ${inputValue?.trim()
+            disabled={!inputValue}
+            className={`p-2 rounded-full transition-all ${inputValue !== null
               ? "bg-buttons/70 text-white hover:bg-buttons/90 shadow-lg shadow-buttons/10 cursor-pointer"
               : "bg-ui-tertiary/20 text-texts-primary"
               }`}

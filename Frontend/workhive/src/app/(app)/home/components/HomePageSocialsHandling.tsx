@@ -1,9 +1,7 @@
 "use client"
-import { useUserContext } from "@/contexts/UserContext";
 import { useToastMsgContext } from "@/contexts/ToastMsgContext";
 import api from "@/lib/axios";
 import handleError from "@/utils/handleError";
-import Link from "next/link";
 import { Activity, useEffect, useState } from "react";
 import { LuSearch, LuArrowRight } from "react-icons/lu";
 import ConnectionsList from "../../../../components/ConnectionsList";
@@ -17,7 +15,6 @@ interface userSocialsInterface {
 const HomePageSocialsHandling = () => {
     const [userSocials, setUserSocials] = useState<userSocialsInterface | null>(null);
     const [errMessage, setErrMessage] = useState<string | null>(null);
-    const { user } = useUserContext();
     const { showToastMsg } = useToastMsgContext();
 
     useEffect(() => {
@@ -36,38 +33,18 @@ const HomePageSocialsHandling = () => {
     }, []);
 
     if (errMessage) {
-        // CASE : A - User is not logged in.
-        if (!user) {
-            return (
-                <Link
-                    href="/auth"
-                    className="group flex flex-col sm:flex-row items-center justify-center gap-3 w-full bg-ui-secondary rounded-3xl p-6 border border-ui-tertiary/20 shadow-md"
-                >
-                    <span className="bg-buttons text-texts-primary font-bold text-lg px-5 py-1.5 rounded-xl shadow-lg transition-colors duration-150 hover:bg-buttons/70 hover:shadow-buttons/10">
-                        Login
-                    </span>
-                    <span className="text-texts-primary font-medium text-lg tracking-wide">
-                        to connect with other people!
-                        <span
-                            className="inline-block ml-1"
-                            role="img"
-                            aria-label="rocket"
-                        >
-                            🚀
-                        </span>
-                    </span>
-                </Link>
-            )
-        } else {
-            // CASE : B - Failed to fetch new data.
-            return (
-                <div className="text-red-500/80 text-lg text-center w-full bg-ui-secondary rounded-3xl p-6 border border-ui-tertiary/10">
-                    {
-                        errMessage || "Unable To Fetch Data At The Moment! <br /> Please Try Again Later."
-                    }
-                </div>
-            )
-        }
+        return (
+            <div
+                className={`group flex flex-col sm:flex-row items-center justify-center gap-3 w-full bg-ui-secondary rounded-3xl p-6 border-2 border-ui-tertiary/20 shadow-md`}
+            >
+                <span className="text-texts-important font-bold text-lg">
+                    {errMessage ? "Ooops!" : "Sorry!"}
+                </span>
+                <span className="text-texts-secondary font-medium text-wm tracking-wide">
+                    {errMessage || "We are currently experiencing server errors, try opening WORKHIVE after sometime."}...
+                </span>
+            </div>
+        )
     }
 
     return (

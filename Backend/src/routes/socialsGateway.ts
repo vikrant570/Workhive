@@ -129,7 +129,8 @@ router.get("/", isLoggedIn, routeHandler(async (req, res) => {
 
     case "full":
       responseKey = "socials"
-      socials = await userSocials.findOne({ user: req.user.userID }, { sentConnectionRequests: 0, blockedBy: 0 })
+      socials = await userSocials.findOneAndUpdate({ user: req.user.userID }, { $set: { "notifications.socials": 0 } }, { new: true })
+        .select("-sentConnectionRequests -blockedBy")
         .populate({
           path: "connections",
           select: "fullname username workplace jobTitle"
@@ -143,6 +144,7 @@ router.get("/", isLoggedIn, routeHandler(async (req, res) => {
           select: "fullname username"
         })
         .lean();
+      break;
     default:
       break;
   }
@@ -213,8 +215,8 @@ router.get("/profile", isLoggedIn, routeHandler(async (req, res) => {
   if (!userID) throw Object.assign(new Error("Authentication failed !"), { status: 401 });
 
   // id and parl are always received (set up in fronted)
-  // id -> userID ||  "0"
-  // parl -> "1" || "0" 
+  // id : userID ||  "0"
+  // parl : "1" || "0" 
   const { id, parl } = req.query;
 
   const setResponse = async () => {
@@ -248,7 +250,7 @@ router.get("/profile", isLoggedIn, routeHandler(async (req, res) => {
         }
       ]);
 
-      const connectionStatus = anotherUserSocials[0].userStatus;
+      const connectionStatus = anotherUserSocials[0]?.userStatus;
 
       if (connectionStatus === "blockedYou") return null;
 
@@ -281,10 +283,19 @@ router.get("/profile", isLoggedIn, routeHandler(async (req, res) => {
   return res.status(200).json({ success: true, profileData: response })
 }))
 
-// Future Feature Based On User Behaviour
-router.get("/suggestions", isLoggedIn, routeHandler(async (req, res) => {
+router.get("/notifications", isLoggedIn, routeHandler(async (req, res) => {
+  if (!req.user) throw Object.assign(new Error("Unauthorized ! "), { status: 401 });
+  const userID = req.user.userID;
 
-}));
+  const fetchNotifications = async () => {
+    const res = await userSocials.findOne({ user: userID });
+    if (!res) return null;
+    return res.notifications;
+  }
+  const notifications = await fetchNotifications();
+
+  return res.status(200).json({ success: true, notifications: notifications });
+}))
 
 router.post("/testingRoute", isLoggedIn, routeHandler(async (req, res) => {
   console.log(req.body);

@@ -29,7 +29,7 @@ const ProjectStateChangeAnimation = ({ projectID, state }: Props) => {
 
     useEffect(() => {
         const interval = setInterval(() => {
-            setSeconds(prev => prev - 1);
+            setSeconds(prev => prev >= 1 ? prev - 1 : prev);
         }, 1000)
 
         const tipsChangingInterval = setInterval(() => {
@@ -64,7 +64,7 @@ const ProjectStateChangeAnimation = ({ projectID, state }: Props) => {
 
                     <div className="h-0.5 w-full bg-gradient-to-r from-buttons to-transparent mt-4 opacity-50"></div>
                     <DotLottieReact
-                        src="/animations`/ProjectCreationSuccess.lottie"
+                        src="/animations/ProjectCreationSuccess.lottie"
                         loop
                         autoplay
                         className="p-0 mt-0"

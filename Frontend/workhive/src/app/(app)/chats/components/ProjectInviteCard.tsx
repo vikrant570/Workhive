@@ -28,17 +28,17 @@ interface Message {
 
 interface Props {
     invite: Message,
-    userID: string
+    userID: string,
+    align: "start" | "end"
 }
 
-const ProjectInviteCard: React.FC<Props> = ({ invite, userID }) => {
+const ProjectInviteCard: React.FC<Props> = ({ invite, userID, align }) => {
     const { user } = useUserContext();
     const [senderDetails, setSenderDetails] = useState<partialUserInfo | null>(null);
     const [error, setError] = useState<String>("");
 
     // Fetch Partial Of The Sender Of The Invite
     useEffect(() => {
-        console.log(invite);
         try {
             const fetchHostDetails = async (hostID: string) => {
                 const res = await fetchUserProfile_client(hostID, "1");
@@ -58,7 +58,7 @@ const ProjectInviteCard: React.FC<Props> = ({ invite, userID }) => {
 
     // Set Dynamic Button/Icon For Different Invite Statuses
     const setActionForInviteStatus = () => {
-        const status = invite.inviteStatus;
+        const status = invite?.inviteStatus;;
         const baseClass = "flex items-center justify-center gap-1 text-xs font-medium rounded-md py-1 px-2"
 
         switch (status) {
@@ -91,7 +91,7 @@ const ProjectInviteCard: React.FC<Props> = ({ invite, userID }) => {
                 );
             case "Accepted":
                 return (
-                    <span className={`${baseClass} bg-ui-tertiary/10 text-green-500/60`}>
+                    <span className={`${baseClass} bg-ui-tertiary/10 text-green-500 font-semibold border border-green-500/20`}>
                         View &nbsp;<LuCheck size={14} />
                     </span>
                 );
@@ -113,16 +113,19 @@ const ProjectInviteCard: React.FC<Props> = ({ invite, userID }) => {
     }
 
     // Destination Link For Invite Card
-    const url = (invite.inviteStatus === "Expired" || invite.inviteStatus === "Rejected") ?
+    const status = invite.inviteStatus;
+    const url = (status === "Expired" || status === "Rejected") ?
         '/#' :
-        `/projects/${invite.project._id}?isOwner=${userID == invite.senderID ? "1" : "0"}&isInvite=1`;
+        (status === "Pending") ?
+            `/projects/${invite.project._id}?inviteStatus=${status}&inviteID=${invite._id}` :
+            `/projects/${invite.project._id}`;
 
     return (
         <Link
             href={url}
-            className={`flex ${invite.senderID == userID ? 'justify-end' : 'justify-start'} animate-in fade-in slide-in-from-bottom-2 duration-300`}
+            className={`flex justify-${align} duration-300`}
         >
-            <div className={`w-full max-w-[80%] md:max-w-md rounded-2xl ${invite.senderID == userID ? "rounded-tr-sm" : "rounded-tl-sm"} ${url === "#" ? "cursor-default" : "hover:bg-ui-secondary/40 transition-all duration-200"} px-4 py-3 relative shadow-md bg-ui-main border border-ui-tertiary/10`}>
+            <div className={`w-full max-w-[80%] md:max-w-md rounded-2xl ${invite.senderID == userID ? "rounded-tr-xs" : "rounded-tl-xs"} ${url === "#" ? "cursor-default" : "hover:bg-ui-secondary/40 transition-all duration-200"} px-4 py-3 relative shadow-md bg-ui-main border border-ui-tertiary/10`}>
 
                 {/* Embedded Project Card */}
                 {invite?.project && senderDetails !== null && (

@@ -1,9 +1,10 @@
 import express from "express";
 const router = express.Router();
-import Projects from "../models/projectsModel.js"
 import Messages from "../models/messaging/messagesModel.js";
 import routeHandler from "../middlewares/globalErrWrap.js";
 import { createNewChat, getAllChats } from "../controllers/chatsDBcontroller.js";
+import Chats from "../models/messaging/chatsModel.js";
+import userSocials from "../models/userSocialsModel.js";
 
 // Get all chats - List
 router.post("/", routeHandler(getAllChats));
@@ -34,6 +35,8 @@ router.get("/:chatID", routeHandler(async (req, res) => {
     .limit(25)
 
   const sortedMessages = messages.reverse();
+  await Chats.findOneAndUpdate({ _id: chatID }, { $set: { "unread.$[elem].count": false } }, { arrayFilters: [{ "elem.user": req.user.userID }] });
+  await userSocials.findOneAndUpdate({ user: req.user.userID }, { $set: { "notifications.messages": 0 } })
 
   res.status(200).json({
     success: true,
@@ -46,23 +49,32 @@ router.get("/:chatID", routeHandler(async (req, res) => {
 router.post("/create", routeHandler(async (req, res) => {
   if (!req.user) throw Object.assign(new Error("Unauthorized!"), { status: 401 });
   const { userID } = req.user;
-  const { projectSetup } = req.query;
+  const groupName = req.body?.groupName;
 
-  // Taking All Particpants Requested To Add In A Chat
   const participants: Array<string> = req.body.connectionIDs;
+  participants.push(String(userID));
 
   try {
-    const newChat = await createNewChat([String(userID), ...participants]);
+    const newChat = await createNewChat(participants, false, groupName || undefined);
 
     return res.status(201).json({
       success: true,
-      newChat: (projectSetup && projectSetup == "1" ? newChat._id : newChat)
+      newChat: (groupName ? newChat._id : newChat)
     });
 
   } catch (err) {
     if (err) throw Object.assign(new Error("Something Went Wrong!"), { status: 500 })
   }
 }));
+
+router.patch("/resetUnreadCount", routeHandler(async (req, res) => {
+  const { chatID } = req.body;
+  const userID = req?.user?.userID;
+
+  await Chats.findByIdAndUpdate(chatID, { $set: { "unread.$[elem].count": false } }, { arrayFilters: [{ "elem.user": userID }] });
+
+  res.status(200).json({ success: true })
+}))
 
 router.post("/setupRoute", routeHandler(async (req, res) => {
   // For testing, automation purposes

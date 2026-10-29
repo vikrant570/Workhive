@@ -15,36 +15,42 @@ const chatController = (io: IOServer) => {
 
     if (!userID) return;
 
-    const allChats = await Chats.find(
-      { participants: { $in: [userID] } },
-      { _id: 1 }
-    );
-    //Join all rooms wherever the user is involved in the chat
-    allChats.forEach((chat) => {
-      socket.join(String(chat!._id));
-    });
+    socket.join(userID);
+    const groupChats = await Chats.find({ participants: userID, chatType: "group" }, { _id: 1 });
 
-    //WHEN SOMEONE SENDS A MESSAGE
+    if (groupChats && groupChats?.length > 0) {
+      groupChats.forEach((chat) => {
+        socket.join(String(chat._id));
+      })
+    }
+
     // If its a project invite, the message field will contain a project's ObjectId
+    // chatID contains either a chatID if the type is group, or a participant's ID if the type is p2p
     socket.on("sendMessage", async (
+      type: "p2p" | "group",
       chatID: string,
       message: string,
       callback: (data: CallbackParams) => void) => {
       try {
-        const msg = await sendMessage(chatID, message, userID);
+        const res = await sendMessage(type, chatID, message, userID);
+        const msg = res.message;
 
-        if (callback && msg) {
+        if (callback && msg._id) {
           callback({
             status: "ok",
             code: "SUCCESS",
-            _id: String(msg._id)
+            _id: String(msg._id),
           });
         }
 
-        socket.to(chatID).emit("messageReceived", msg);
+        if (type === "p2p") {
+          io.to(chatID).emit("messageReceived", res);
+        } else {
+          socket.to(chatID).emit("messageReceived", res);
+        }
+
         //Send a push notification to those who are offline
         //Adding logic later....
-
       } catch (error: any) {
         if (callback) {
           callback({
@@ -52,49 +58,6 @@ const chatController = (io: IOServer) => {
             code: "ERROR",
             message: error?.message || "Failed to send message!",
             _id: ""
-          });
-        }
-      }
-    });
-
-    socket.on("askReport", async (memberID, taskTitle, projectTitle, callback) => {
-      try {
-        let chat = await Chats.findOne({ p2pKey: [userID, memberID].sort().join("_") }, { _id: 1, participants: 1, blocked: 1 }).lean();
-
-        if (!chat) {
-          const newChat = await createNewChat([userID, memberID], true);
-          socket.join(String(newChat._id));
-          chat = newChat;
-        }
-
-        if (chat.blocked) {
-          callback({
-            status: "failed",
-            code: "BLOCKED"
-          })
-        }
-
-        const chatID = String(chat._id);
-        const msg = `Asking progress report for [${taskTitle}[ ongoing under the project | ${projectTitle}.`
-
-        const msgResponse = await sendMessage(chatID, msg, userID);
-
-        if (callback && msgResponse) {
-          callback({
-            status: "ok",
-            code: "SUCCESS"
-          });
-        }
-
-        socket.to(chatID).emit("messageReceived", msgResponse);
-        //Add push notification logic here later
-      }
-      catch (error: any) {
-        if (callback) {
-          callback({
-            status: "failed",
-            code: "ERROR",
-            message: error?.message || "Failed to send message!"
           });
         }
       }

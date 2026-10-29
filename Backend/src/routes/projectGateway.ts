@@ -1,6 +1,8 @@
 import express from "express";
 import Projects from "../models/projectsModel.js";
 import routeHandler from "../middlewares/globalErrWrap.js";
+import { createNewChat } from "../controllers/chatsDBcontroller.js";
+import { callToActionForInvites, updateReport } from "../controllers/projectSideTasksController.js"
 const router = express.Router();
 
 //For viewing list of projects
@@ -31,46 +33,53 @@ router.get("/", routeHandler(async (req, res) => {
 router.get("/:id", routeHandler(async (req, res) => {
   if (!req.user) throw Object.assign(new Error("Please login/register first !"), { status: 400 });
 
-  // Also show the project in which you are a particpant
-  const project = await Projects.findOne({
-    _id: req.params.id,
-    members: req.user.userID
-  })
-    .populate({
-      path: "members",
-      select: "fullname"
-    })
-    .populate({
-      path: "tasks.assignedTo",
-      select: "fullname"
-    })
-    .populate({
+  const view = req.query.required;
+  if (!view) throw Object.assign(new Error("Bad Request !"), { status: 400 });
+
+  const select = view !== "full" ? "-attachments -members -departments" : "";
+
+  const project = await Projects.findById(req.params.id).select(select);
+
+  if (!project) throw Object.assign(new Error("Project not found !"), { status: 404 });
+
+  if (view !== "full") {
+    await project?.populate({
       path: "owner",
       select: "fullname username"
     })
-
-  if (!project) throw Object.assign(new Error("Project not found !"), { status: 404 });
+  } else {
+    await project?.populate([
+      { path: "members", select: "fullname" },
+      { path: "tasks.assignedTo", select: "fullname" },
+      { path: "departments.head", select: "fullname" }
+    ])
+  }
 
   const isOwner = project.owner?._id?.toString() === req.user.userID;
   return res.status(200).json({ success: true, isOwner: isOwner, project: project });
 }));
 
 //For Creating a Entirely New Project.
-router.post("/", routeHandler(async (req, res) => {
-  const { title, members, priority, deadline, tasks, attachments } = req.body;
+router.put("/", routeHandler(async (req, res) => {
+  const { title, priority, deadline, tasks, attachments, groupName, departments } = req.body;
 
-  if (!title || !members || !priority || !deadline || !tasks || !req.user?.userID) {
+  if (!title || !priority || !deadline || !tasks || !req.user?.userID) {
     throw Object.assign(new Error("All fields are required !"), { status: 400 })
   }
 
+  const chatRoom = await createNewChat([String(req.user.userID)], false, groupName);
+  if (!chatRoom) throw Object.assign(new Error("Failed To Create Chat Room !"), { status: 400 });
+
   const newProject = await Projects.create({
     title,
-    members: [req.user.userID, ...members],
+    members: [req.user.userID],
     priority,
     tasks,
     owner: req.user?.userID,
     deadline: new Date(deadline),
     attachments: attachments || [],
+    departments: departments && departments.length > 0 ? departments : [],
+    chatRoom: chatRoom?._id
   });
 
   if (!newProject) throw Object.assign(new Error("Failed to create project !"), { status: 400 })
@@ -111,5 +120,9 @@ router.delete("/:id", routeHandler(async (req, res) => {
     message: "Project deleted successfully.",
   });
 }));
+
+// Other Actions - Controllers
+router.patch("/invite-action/:id", routeHandler(callToActionForInvites));
+router.patch("/reportUpdate", routeHandler(updateReport));
 
 export default router;

@@ -13,7 +13,7 @@ export interface ServerToClientEvents {
 export interface ClientToServerEvents {
   hello: () => void;
   join_room: (roomId: string) => void;
-  sendMessage: (chatID: string, message: string, callback: (res: any) => void) => void;
+  sendMessage: (type: "p2p" | "group", chatID: string, message: string, callback: (res: any) => void) => void;
   askReport: (memberId: string, taskTitle: string, projectTitle: string, callback: (res: any) => void) => void;
   inviteToProject: (chatID: string, project: any, callback: (res: any) => void) => void;
 }

@@ -21,22 +21,25 @@ import { createNewProject, editProject } from "@/ctaApiLogics/projectGateway";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useToastMsgContext } from "@/contexts/ToastMsgContext";
+import { useUserContext } from "@/contexts/UserContext";
 
-import MemberDropDown from "../components/MemberDropDown";
-import ProjectStateChangeAnimation from "../components/StateAnimation";
+import { MemberDropDown, SelectedItemsList, AssignItemsDropDown, OpenDropDownButton } from "../components/editor/DropDowns";
+import ProjectStateChangeAnimation from "../components/editor/StateAnimation";
 
 import handleError from "@/utils/handleError";
 import { fetchConnectionsList_client, fetchSingleProject_client } from "@/lib/fetchData.client";
 import { parseDateForFormInput } from "@/utils/dateTimeFormatter";
 
 import { Project, Task } from "../[id]/page";
+import ChatNamePrompter from "../components/editor/ChatNamePrompter";
 
 // --- Interfaces  ---
 export interface ProjectFormData {
   title: string;
   deadline: string;
   priority: "high" | "medium" | "low";
-  status: "Completed" | "Cancelled" | "In progress"
+  status: "Completed" | "Cancelled" | "In progress";
+  groupName?: string
 }
 
 interface Res {
@@ -48,6 +51,7 @@ interface Res {
 
 const CreateProjectContent = () => {
   const { showToastMsg } = useToastMsgContext();
+  const { user } = useUserContext();
 
   const searchParams = useSearchParams();
   const isEditMode = searchParams.get("edit") === "1" ? true : false;
@@ -59,10 +63,11 @@ const CreateProjectContent = () => {
     title: "",
     deadline: "",
     priority: "medium",
-    status: "In progress"
+    status: "In progress",
+    groupName: ""
   });
-  const [originalData, setOriginalData] = useState<Project>()
 
+  const [originalData, setOriginalData] = useState<Project>()
   const [userConnections, setUserConnections] = useState<partialUserInfo[]>([]);
 
   // Fetching Connections To Display Them In Member Selection Tab
@@ -81,17 +86,16 @@ const CreateProjectContent = () => {
   const [selectedMembers, setSelectedMembers] = useState<partialUserInfo[]>([]);
   const [tasks, setTasks] = useState<Task[]>([]);
   const [files, setFiles] = useState<Pick<File, "name" | "size">[]>([]);
+  const [departments, setDepartments] = useState<{ name: string, head: string }[]>([]);
 
-  // Task Input State
-  const [currentTask, setCurrentTask] = useState<{ title: string; assignedToId: string }>({
-    title: "",
-    assignedToId: ""
-  });
+  // Controlled Input States
+  const [currentTask, setCurrentTask] = useState<Pick<Task, "title" | "department"> & { assignedToId: string }>({ title: "", department: "", assignedToId: "" });
+  const [currDept, setCurrDept] = useState<{ name: string, head: string }>({ name: "", head: "" });
 
   // UI State for custom dropdowns
   const [isMemberDropdownOpen, setIsMemberDropdownOpen] = useState<boolean>(false);
-  const [isAssignDropdownOpen, setIsAssignDropdownOpen] = useState<boolean>(false);
-  const textInputStyle = "w-full bg-ui-main border border-ui-tertiary/20 rounded-xl px-4 py-2.5 text-texts-primary text-sm focus:outline-none focus:border-buttons focus:ring-1 focus:ring-buttons transition-all";
+  const [chatNamePrompterState, setChatNamePrompterState] = useState<"none" | "prompted" | "closed">("none");
+  const textInputStyle = "bg-ui-main border border-ui-tertiary/20 rounded-xl px-4 py-2.5 text-texts-primary text-sm focus:outline-none focus:border-buttons focus:ring-1 focus:ring-buttons transition-all";
   const labelStyle = "text-xs font-bold text-texts-secondary uppercase tracking-wider"
 
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -103,24 +107,20 @@ const CreateProjectContent = () => {
         if (!projectID || !isEditMode) return;
 
         const res = await fetchSingleProject_client(projectID);
-        const project = res.project as Project;
-
-        console.log(typeof project.deadline)
+        const project = res.project as Project
 
         if (!res.isOwner) {
-          router.push(`/projects/${projectID}?isInvite=0`);
+          router.push(`/projects/${projectID}`);
           return;
         }
+        const { title, deadline, priority, status, members, tasks } = project;
+        setFormData({ title, deadline, priority, status })
+        setSelectedMembers(members);
+        setTasks(tasks);
+        if (project.departments && project.departments?.length > 0) {
+          setDepartments(project.departments.map((d) => ({ name: d.name, head: d.head._id })))
+        }
 
-        setFormData({
-          title: project.title,
-          deadline: project.deadline,
-          priority: project.priority,
-          status: project.status
-        })
-
-        setSelectedMembers(project.members);
-        setTasks(project.tasks);
         setFiles(project.attachments.map(att => ({
           name: att,
           size: 12313143   //Size will come from backend after uploading to cloudinary
@@ -169,16 +169,35 @@ const CreateProjectContent = () => {
       _id: Date.now().toString(),
       title: currentTask.title,
       assignedTo: { _id: assignedUser._id, fullname: assignedUser.fullname },
+      department: currentTask.department,
       status: "In progress"
     };
 
     setTasks(prev => [...prev, newTask]);
-    setCurrentTask({ title: "", assignedToId: "" }); // Reset inputs
+    setCurrentTask({ title: "", assignedToId: "", department: "" }); // Reset inputs
   };
 
-  const removeTask = (taskId: string) => {
-    setTasks(prev => prev.filter(t => t._id !== taskId));
-  };
+  //Dept. Handler
+  const addDept = () => {
+    if (!currDept.name.trim() || !currDept.head.trim()) return;
+    if (currDept.name.length > 20) {
+      showToastMsg({ text: "Department name can't exceed 20 characters", type: "info" })
+      return;
+    }
+
+    const newDept = {
+      name: currDept.name,
+      head: currDept.head
+    };
+
+    if (departments.some(d => d.name === newDept.name)) {
+      showToastMsg({ text: "Avoid adding duplicate values!", type: "error" });
+      return;
+    }
+
+    setDepartments(prev => [...prev, newDept]);
+    setCurrDept({ name: "", head: "" });
+  }
 
   // File Handlers
   const handleFileChange = (e: ChangeEvent<HTMLInputElement>) => {
@@ -206,16 +225,17 @@ const CreateProjectContent = () => {
 
     try {
       const callToActionProject = async () => {
-        if (mode == "create") {
-          return await createNewProject({ formData, selectedMembers, tasks, files });
+        if (mode == "create" && user) {
+          return await createNewProject(user._id, { formData, departments, selectedMembers, tasks, files });
         }
+
         else {
           if (!projectID || !originalData) {
             showToastMsg({ text: "Your access to this page is denied!", type: "error" })
             router.push("/projects")
             return
           }
-          return await editProject(originalData, { projectID, formData, selectedMembers, tasks, files })
+          return await editProject(originalData, { projectID, departments, formData, selectedMembers, tasks, files })
         }
       }
 
@@ -234,11 +254,16 @@ const CreateProjectContent = () => {
     }
   }
 
+  useEffect(() => {
+    if (chatNamePrompterState === "closed") {
+      handleSubmit()
+    }
+  }, [chatNamePrompterState])
+
   return (
     <div className="min-h-screen bg-ui-main p-8 ml-55 text-texts-primary">
-      {
-        creationSuccess && creationSuccess.success && <ProjectStateChangeAnimation projectID={creationSuccess._id} state={"success"} />
-      }
+      {creationSuccess && creationSuccess.success && <ProjectStateChangeAnimation projectID={creationSuccess._id} state={"success"} />}
+      {chatNamePrompterState === "prompted" && <ChatNamePrompter setIsGroupNamePrompterOpen={setChatNamePrompterState} title={formData.title} setFormData={setFormData} />}
       {/* Header */}
       <div className="mb-8">
         <h1 className="text-3xl font-bold tracking-tight mb-2">Create New Project</h1>
@@ -266,7 +291,7 @@ const CreateProjectContent = () => {
                 onChange={handleInputChange}
                 required
                 placeholder="e.g. Q3 Marketing Campaign"
-                className={textInputStyle}
+                className={`${textInputStyle} w-full`}
               />
             </div>
 
@@ -312,109 +337,130 @@ const CreateProjectContent = () => {
           </div>
         </div>
 
-        <div className="grid grid-cols-2 gap-7">
-          {/* 2. Members Selection Card */}
-          <div className="bg-ui-secondary rounded-3xl p-6 border border-ui-tertiary/10 shadow-lg">
-            <h2 className="text-lg font-bold mb-6 flex items-center gap-2 text-texts-primary">
-              <LuUsers size={20} className="text-purple-400" /> Team Members
-            </h2>
+        {/* 2. Members Selection Card */}
+        <div className="bg-ui-secondary rounded-3xl p-6 border border-ui-tertiary/10 shadow-lg">
+          <h2 className="text-lg font-bold mb-6 flex items-center gap-2 text-texts-primary">
+            <LuUsers size={20} className="text-purple-400" /> Team Members
+          </h2>
 
-            {/* Dropdown Trigger */}
-            <div className="relative mb-4">
-              <button
-                onClick={() => setIsMemberDropdownOpen(!isMemberDropdownOpen)}
-                className="w-full flex items-center justify-between bg-ui-main border border-ui-tertiary/20 rounded-xl px-4 py-3 text-texts-primary hover:border-buttons/50 transition-all text-left"
-              >
-                <span className={selectedMembers.length === 0 ? "text-texts-secondary" : ""}>
-                  {selectedMembers.length > 0 ? "Add more members..." : "Select team members..."}
-                </span>
-                <LuChevronDown size={18} className={`transition-transform duration-200 ${isMemberDropdownOpen ? "rotate-180" : ""}`} />
-              </button>
+          {/* Dropdown Trigger */}
+          <div className="relative mb-4">
+            <button
+              onClick={() => setIsMemberDropdownOpen(!isMemberDropdownOpen)}
+              className="w-full flex items-center justify-between bg-ui-main border border-ui-tertiary/20 rounded-xl px-4 py-3 text-texts-primary hover:border-buttons/50 transition-all text-left"
+            >
+              <span className={selectedMembers.length === 0 ? "text-texts-secondary" : ""}>
+                {selectedMembers.length > 0 ? "Add more members..." : "Select team members..."}
+              </span>
+              <LuChevronDown size={18} className={`transition-transform duration-200 ${isMemberDropdownOpen ? "rotate-180" : ""}`} />
+            </button>
 
-              {/* Dropdown Menu */}
-              {isMemberDropdownOpen && userConnections && <MemberDropDown toggleMember={toggleMember} selectedMembers={selectedMembers} members={userConnections} />}
-            </div>
+            {/* Dropdown Menu */}
+            {isMemberDropdownOpen && userConnections && <MemberDropDown toggleMember={toggleMember} selectedMembers={selectedMembers} members={userConnections} />}
+          </div>
 
-            {/* Selected Members List */}
-            {selectedMembers.length > 0 && (
-              <div className="space-y-2">
-                <p className="text-sm font-bold text-texts-secondary uppercase tracking-wider mb-2">Selected ({selectedMembers.length})</p>
-                <div className="flex flex-wrap gap-2">
-                  {selectedMembers.map(member => (
-                    <div key={member._id} className="flex items-center gap-2 bg-ui-main border border-ui-tertiary/20 px-2 py-1.5 rounded-lg">
-                      <span className="text-sm font-medium">{member.fullname}</span>
-                      <button onClick={() => toggleMember(member)} className="p-0.5 rounded hover:bg-red-500/20 text-texts-secondary hover:text-red-500 transition-colors">
-                        <LuX size={14} />
-                      </button>
-                    </div>
-                  ))}
-                </div>
+          {/* Selected Members List */}
+          {selectedMembers.length > 0 && (
+            <div className="space-y-2">
+              <p className="text-sm font-bold text-texts-secondary uppercase tracking-wider mb-2">Selected ({selectedMembers.length})</p>
+              <div className="flex flex-wrap gap-2">
+                {selectedMembers.map(member => (
+                  <div key={member._id} className="flex items-center gap-2 bg-ui-main border border-ui-tertiary/20 px-2 py-1.5 rounded-lg">
+                    <span className="text-sm font-medium">{member.fullname}</span>
+                    <button onClick={() => toggleMember(member)} className="p-0.5 rounded hover:bg-red-500/20 text-texts-secondary hover:text-red-500 transition-colors">
+                      <LuX size={14} />
+                    </button>
+                  </div>
+                ))}
               </div>
-            )}
-          </div>
-
-          {/* Departments Input */}
-          <div className="space-y-2 bg-ui-secondary rounded-3xl p-6 border border-ui-tertiary/10 shadow-lg">
-            <h2 className="text-lg font-bold mb-6 flex items-center gap-2 text-texts-primary">
-              <LuBuilding size={20} className="text-purple-400" /> Departments
-            </h2>
-            <input
-              type="text"
-              placeholder="e.g. Finances"
-              className={textInputStyle}
-            />
-          </div>
+            </div>
+          )}
         </div>
 
 
-        {/* 3. File LuUpload Card */}
-        <div className="bg-ui-secondary rounded-3xl p-6 border border-ui-tertiary/10 shadow-lg w-full">
-          <h2 className="text-lg font-bold mb-6 flex items-center gap-2 text-texts-primary">
-            <LuPaperclip size={20} className="text-blue-400" /> Attachments
-          </h2>
+        <div className="flex justify-start gap-5">
+          {/* 3. Attachments tab */}
+          <div className="bg-ui-secondary rounded-3xl p-6 border border-ui-tertiary/10 shadow-lg w-1/3">
+            <h2 className="text-lg font-bold mb-6 flex items-center gap-2 text-texts-primary">
+              <LuPaperclip size={20} className="text-blue-400" /> Attachments
+            </h2>
 
-          <div
-            className="border-2 border-dashed border-ui-tertiary/20 rounded-2xl p-8 text-center hover:border-buttons/50 hover:bg-ui-main/30 transition-all cursor-pointer group"
-            onClick={() => fileInputRef.current?.click()}
-          >
-            <div className="w-12 h-12 bg-ui-main rounded-full flex items-center justify-center mx-auto mb-3 group-hover:scale-110 transition-transform shadow-lg">
-              <LuUpload size={20} className="text-buttons" />
+            <div
+              className="border-2 border-dashed border-ui-tertiary/20 rounded-2xl p-8 text-center hover:border-buttons/50 hover:bg-ui-main/30 transition-all cursor-pointer group"
+              onClick={() => fileInputRef.current?.click()}
+            >
+              <div className="w-12 h-12 bg-ui-main rounded-full flex items-center justify-center mx-auto mb-3 group-hover:scale-110 transition-transform shadow-lg">
+                <LuUpload size={20} className="text-buttons" />
+              </div>
+              <p className="text-sm font-medium text-texts-primary mb-1">Click to upload documents</p>
+              <p className="text-xs text-texts-secondary">SVG, PNG, JPG or GIF (max. 10MB)</p>
+              <input
+                type="file"
+                ref={fileInputRef}
+                className="hidden"
+                multiple
+                accept=".jpg,.jpeg,.png,.heic,.pdf,.pptx,.xlsx,.csv,.txt"
+                onChange={handleFileChange}
+              />
             </div>
-            <p className="text-sm font-medium text-texts-primary mb-1">Click to upload documents</p>
-            <p className="text-xs text-texts-secondary">SVG, PNG, JPG or GIF (max. 10MB)</p>
-            <input
-              type="file"
-              ref={fileInputRef}
-              className="hidden"
-              multiple
-              accept=".jpg,.jpeg,.png,.heic,.pdf,.pptx,.xlsx,.csv,.txt"
-              onChange={handleFileChange}
-            />
+
+            {/* Files List */}
+            {<Activity mode={files.length > 0 ? "visible" : "hidden"}>
+              <div className="mt-6 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                {files.map((file, index) => (
+                  <div key={index} className="flex items-center gap-3 p-3 rounded-xl bg-ui-main border border-ui-tertiary/10 hover:border-buttons/30 transition-all group">
+                    <div className="p-2 rounded-lg bg-ui-secondary">
+                      {getFileIcon(file.name)}
+                    </div>
+                    <div className="flex-1 overflow-hidden">
+                      <p className="text-sm font-medium text-texts-primary truncate">{file.name}</p>
+                      <p className="text-[10px] text-texts-secondary">{(file.size / 1024 / 1024).toFixed(2)} MB</p>
+                    </div>
+                    <button
+                      onClick={() => removeFile(index)}
+                      className="p-1.5 text-texts-secondary hover:text-red-500 hover:bg-red-500/10 rounded-lg transition-colors"
+                    >
+                      <LuX size={14} />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </Activity>
+            }
           </div>
 
-          {/* Files List */}
-          {<Activity mode={files.length > 0 ? "visible" : "hidden"}>
-            <div className="mt-6 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-              {files.map((file, index) => (
-                <div key={index} className="flex items-center gap-3 p-3 rounded-xl bg-ui-main border border-ui-tertiary/10 hover:border-buttons/30 transition-all group">
-                  <div className="p-2 rounded-lg bg-ui-secondary">
-                    {getFileIcon(file.name)}
-                  </div>
-                  <div className="flex-1 overflow-hidden">
-                    <p className="text-sm font-medium text-texts-primary truncate">{file.name}</p>
-                    <p className="text-[10px] text-texts-secondary">{(file.size / 1024 / 1024).toFixed(2)} MB</p>
-                  </div>
-                  <button
-                    onClick={() => removeFile(index)}
-                    className="p-1.5 text-texts-secondary hover:text-red-500 hover:bg-red-500/10 rounded-lg transition-colors"
-                  >
-                    <LuX size={14} />
-                  </button>
+          {/* Departments Input */}
+          <div className="space-y-2 bg-ui-secondary rounded-3xl p-6 border border-ui-tertiary/10 shadow-lg flex-1 max-h-full">
+            <h2 className="text-lg font-bold mb-3 flex items-center gap-2 text-texts-primary">
+              <LuBuilding size={20} className="text-purple-400" /> Departments
+            </h2>
+            <div className="bg-ui-main/50 rounded-xl p-4 border border-ui-tertiary/10 mb-3">
+              <div className="grid grid-cols-1 md:grid-cols-14 gap-3 items-end">
+
+                <div className="md:col-span-7">
+                  <label className={labelStyle}>Department Name</label>
+                  <input
+                    type="text"
+                    placeholder="e.g. Finances"
+                    onChange={(e) => { setCurrDept((prev) => ({ ...prev, name: e.target.value })) }}
+                    value={currDept.name}
+                    className={`${textInputStyle} text-lg w-full`}
+                  />
                 </div>
-              ))}
+
+                <OpenDropDownButton items={selectedMembers} setCurrVal={setCurrDept} dropdownFor="mem_to_dept" currVal={currDept} />
+
+                <button
+                  className="md:col-span-1 h-[42px] bg-buttons text-ui-main rounded-xl flex items-center justify-center hover:bg-buttons/90 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+                  disabled={currDept.head === "" || currDept.name === ""}
+                  onClick={() => { addDept() }}
+                >
+                  <LuPlus size={20} />
+                </button>
+              </div>
             </div>
-          </Activity>
-          }
+            <SelectedItemsList selectedMembers={selectedMembers} selection="department" setItem={setDepartments} items={departments} />
+          </div>
         </div>
 
         {/* 4. Task Management Tab */}
@@ -425,64 +471,25 @@ const CreateProjectContent = () => {
 
           {/* Task Creation Form */}
           <div className="bg-ui-main/50 rounded-xl p-4 border border-ui-tertiary/10 mb-6">
-            <div className="grid grid-cols-1 md:grid-cols-12 gap-4 items-end">
+            <div className="grid grid-cols-1 md:grid-cols-14 gap-4 items-end">
 
               {/* Input */}
-              <div className="md:col-span-7 space-y-2">
+              <div className="md:col-span-6 space-y-2">
                 <label className={labelStyle}>Sub-task Title</label>
                 <input
                   type="text"
                   placeholder="e.g. Design Homepage Mockups"
                   value={currentTask.title}
                   onChange={(e) => setCurrentTask(prev => ({ ...prev, title: e.target.value }))}
-                  className={textInputStyle}
+                  className={`${textInputStyle} w-full`}
                 />
               </div>
 
-              {/* Assignee Custom Dropdown */}
-              <div className="md:col-span-4 space-y-2">
-                <label className={labelStyle}>Assign To</label>
-                <div className="relative">
-                  <button
-                    onClick={() => setIsAssignDropdownOpen(!isAssignDropdownOpen)}
-                    className="w-full bg-ui-main border border-ui-tertiary/20 rounded-xl px-4 py-2.5 text-texts-primary text-sm flex items-center justify-between hover:border-buttons/50 transition-all text-left"
-                  >
-                    <span className={!currentTask.assignedToId ? "text-texts-secondary" : ""}>
-                      {currentTask.assignedToId
-                        ? selectedMembers.find(m => m._id === currentTask.assignedToId)?.fullname || "Select Member"
-                        : "Select Member"
-                      }
-                    </span>
-                    <LuChevronDown size={14} className={`transition-transform duration-200 ${isAssignDropdownOpen ? "rotate-180" : ""}`} />
-                  </button>
+              {/* Assign Department To Task */}
+              <OpenDropDownButton currVal={currentTask} setCurrVal={setCurrentTask} items={departments} dropdownFor="dept_to_task" />
 
-                  {isAssignDropdownOpen && (
-                    <div className="absolute top-full left-0 right-0 mt-2 bg-ui-main border border-ui-tertiary/20 rounded-xl shadow-xl z-20 max-h-48 overflow-y-auto custom-scrollbar">
-                      {selectedMembers.length > 0 ? (
-                        selectedMembers.map(m => (
-                          <div
-                            key={m._id}
-                            onClick={() => {
-                              setCurrentTask(prev => ({ ...prev, assignedToId: m._id }));
-                              setIsAssignDropdownOpen(false);
-                            }}
-                            className="px-4 py-2.5 flex items-center gap-3 cursor-pointer hover:bg-ui-secondary transition-colors"
-                          >
-                            <div className="w-6 h-6 rounded-full bg-ui-secondary border border-ui-tertiary/20 flex items-center justify-center text-[10px] font-bold">
-                              {m.fullname[0]}
-                            </div>
-                            <span className="text-sm">{m.fullname}</span>
-                          </div>
-                        ))
-                      ) : (
-                        <div className="px-4 py-3 text-xs text-texts-secondary text-center">
-                          Select some members first
-                        </div>
-                      )}
-                    </div>
-                  )}
-                </div>
-              </div>
+              {/* Assign Member To Task */}
+              <OpenDropDownButton currVal={currentTask} setCurrVal={setCurrentTask} items={selectedMembers} dropdownFor="mem_to_task" />
 
               {/* Add Button */}
               <div className="md:col-span-1">
@@ -498,35 +505,7 @@ const CreateProjectContent = () => {
           </div>
 
           {/* Tasks List */}
-          {tasks.length > 0 ? (
-            <div className="space-y-3">
-              {tasks.map((task) => (
-                <div key={task._id} className="flex items-center justify-between p-3 rounded-xl bg-ui-main border border-ui-tertiary/10 hover:border-buttons/30 transition-all group">
-                  <div className="flex items-center gap-4">
-                    <div className="w-8 h-8 rounded-full bg-ui-secondary flex items-center justify-center text-buttons font-bold text-sm">
-                      {selectedMembers.find(m => m._id === task.assignedTo._id)?.fullname[0]}
-                    </div>
-                    <div>
-                      <p className="font-medium text-sm text-texts-primary">{task.title}</p>
-                      <p className="text-xs text-texts-secondary flex items-center gap-1">
-                        Assigned to <span className="text-texts-primary">{selectedMembers.find(m => m._id === task.assignedTo._id)?.fullname}</span>
-                      </p>
-                    </div>
-                  </div>
-                  <button
-                    onClick={() => removeTask(task._id)}
-                    className="p-2 text-texts-secondary hover:text-red-500 hover:bg-red-500/10 rounded-lg transition-colors"
-                  >
-                    <LuTrash2 size={16} />
-                  </button>
-                </div>
-              ))}
-            </div>
-          ) : (
-            <div className="text-center py-8 border-2 border-dashed border-ui-tertiary/10 rounded-xl text-texts-secondary text-sm">
-              No tasks added yet. Add tasks above.
-            </div>
-          )}
+          <SelectedItemsList items={tasks} selectedMembers={selectedMembers} setItem={setTasks} selection="task" />
         </div>
 
       </div>
@@ -539,7 +518,7 @@ const CreateProjectContent = () => {
             Cancel
           </Link>
           <button
-            onClick={handleSubmit}
+            onClick={() => setChatNamePrompterState("prompted")}
             className="px-8 py-2.5 bg-buttons text-ui-main rounded-xl font-bold hover:bg-buttons/90 hover:shadow-lg hover:shadow-buttons/20 transition-all flex items-center gap-2"
           >
             <LuSave size={18} /> {isEditMode ? "Save Changes" : "Create"}

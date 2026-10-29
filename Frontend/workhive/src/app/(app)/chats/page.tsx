@@ -1,5 +1,5 @@
 "use client";
-import { Suspense, useEffect, useRef, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 
 //ICONS
 import { LuMessagesSquare, LuLock, LuSearch } from "react-icons/lu";
@@ -10,7 +10,7 @@ import { useSearchParams } from "next/navigation";
 
 // COMPONENTS
 import ChatInterface from "./components/ChatInterface";
-import ChatList from "./components/ChatList";
+import ChatListElement, { Chat } from "./components/ChatList";
 import FullContentError from "@/components/global_compns/FullContentError";
 
 import { useChatMsgContext } from "@/contexts/ChatMsgContext";
@@ -19,61 +19,31 @@ import { useToastMsgContext } from "@/contexts/ToastMsgContext";
 import handleError from "@/utils/handleError";
 import { createNewChat } from "@/ctaApiLogics/chatGateway";
 import { CgSpinner } from "react-icons/cg";
+import { useUserContext } from "@/contexts/UserContext";
+import { AvatarColorPallete, EmptyChatPlaceholder } from "./components/Extras";
 
-interface Chat {
-  participants: Array<{ fullname: string, _id: string }>,
-  groupName: string,
-  _id: string
-}
 interface Res {
   success: boolean,
-  chats: Array<any>;
+  chats: Array<Chat>;
 }
-interface Msg {
+export interface Msg {
   _id: string,
   senderID: string,
   chatID: string,
   text: string,
   delivered: boolean,
-  createdAt: string
-}
-
-const EmptyChatPlaceholder = ({ fallback }: { fallback: "fullPage" | "onlyMessages" }) => {
-  return (
-    <div className={`bg-ui-secondary border-r border-white/30 h-screen ${fallback === "fullPage" ? "w-full ml-55" : "w-3xl"} flex flex-col items-center justify-center relative`}>
-      {/* Center Content */}
-      <div className="flex flex-col items-center text-center max-w-sm px-6">
-        <div className="w-24 h-24 bg-ui-main rounded-full flex items-center justify-center mb-6 shadow-lg shadow-buttons/10">
-          <LuMessagesSquare size={44} className="text-buttons opacity-80" />
-        </div>
-
-        <h2 className="text-xl font-semibold text-texts-primary mb-2">
-          WorkHive Workspace
-        </h2>
-
-        <p className="text-texts-secondary text-sm leading-relaxed">
-          Select a conversation from the sidebar to start collaborating, or create a new project chat.
-        </p>
-      </div>
-
-      {/* Bottom Security Note */}
-      <div className="absolute bottom-8 flex items-center gap-1.5 text-texts-secondary/50 text-xs font-medium">
-        <LuLock size={12} />
-        <span>Secure, real-time collaboration</span>
-      </div>
-
-    </div>
-  );
+  createdAt: string,
 }
 
 const ChatsContent = () => {
   //will get from the cookie or compare using Oid
-  const [chats, setChats] = useState<Array<any>>([]);
+  const [chats, setChats] = useState<Array<Chat>>([]);
   const [chatID, setChatID] = useState<string>("");
-  const [chatName, setChatName] = useState<string>("");
+  const [currentChat, setCurrentChat] = useState<{ recipientKey: string, chatName: string } | null>(null);
 
   // Contexts
-  const { msg } = useChatMsgContext();
+  const { msg, setCurrentlyOpened, messageSender } = useChatMsgContext();
+  const { user } = useUserContext();
   const { showToastMsg } = useToastMsgContext();
 
   // For Refresh Sorting Of Chats on sending/receving message;
@@ -96,18 +66,20 @@ const ChatsContent = () => {
   // --- If User Arriving From Any Indirect Route --- 
   const OpenChat = (chat: Chat) => {
     setChatID(chat?._id);
-    setChatName(chat?.groupName || chat?.participants[0].fullname);
+
+    const pickedChatName = chat.chatType === "group" ? chat.group?.name : chat.participants[0].fullname
+
+    const recipientKey = chat.chatType === "p2p" ? chat.participants[0]._id : chat._id;
+    setCurrentChat({ recipientKey: String(recipientKey), chatName: pickedChatName || "Unknown" })
     setChatOpen(true);
   }
 
   const IndirectChatOpen = async () => {
-    const chat = (chats as Chat[]).find(
-      chat => chat?.participants[0]?._id === connectionId
-    );
+    const chat = (chats as Chat[]).find(chat => chat.p2pKey === [user?._id, connectionId].sort().join("_"))
     // Case 1 : User Doesn't Have Any Chat With This Connection
     if (!chat && connectionId) {
       try {
-        const newChat: Chat = await createNewChat([connectionId], "0");
+        const newChat: Chat = await createNewChat([connectionId]);
         setChats((prev) => [newChat, ...prev]);
 
         OpenChat(newChat);
@@ -121,7 +93,7 @@ const ChatsContent = () => {
     }
   }
 
-  //Get all the chats from database
+  //Initial fetch - All Chats
   useEffect(() => {
     const fetchChatList = async () => {
       try {
@@ -135,17 +107,64 @@ const ChatsContent = () => {
       }
     }
     fetchChatList();
+  }, [])
 
-    // Later On Upgrading For Group Chats Too 054
-    if (connectionId && chats) {
+  const sortChats = (message: Msg) => {
+    const recentChat = chats?.find(c => c._id === message.chatID);
+
+    if (recentChat) {
+      const updated = {
+        ...recentChat,
+        lastMessage: { sender: { _id: message.senderID, fullname: "" }, text: message.text },
+        updatedAt: new Date(),
+        unread: recentChat.unread.map(u =>
+          String(u.user) === String(user?._id) ? { ...u, count: true } : u
+        )
+      };
+
+      setChats(prev => [updated!, ...(prev.filter(c => c._id !== message.chatID))]);
+    }
+
+    else if (!recentChat && messageSender && user) {
+      // Creat a chat replica instantly if a message arrives from a newly created chat.
+      const newChat: Chat = {
+        _id: message.chatID,
+        participants: [{ _id: message.senderID, fullname: messageSender.name }],
+        lastMessage: { sender: { _id: message.senderID, fullname: "" }, text: message.text },
+        unread: [{ user: user._id, count: true }],
+        updatedAt: new Date(),
+        chatType: 'p2p',
+        isBlocked: false,
+        p2pKey: [user._id, message.senderID].sort().join("_"),
+      }
+      setChats(prev => [newChat, ...prev]);
+    }
+
+    setInteraction(null);
+  }
+
+  useEffect(() => {
+    if (connectionId && chats.length > 0) {
       IndirectChatOpen()
     }
-  }, []);
+  }, [chats])
 
-  // Listenin to msg and providing to components on arrival
+  // Listening to msg and providing to components on arrival
   useEffect(() => {
-    if (msg?._id !== "") setInteraction(msg);
-  }, [msg]);
+    if (!msg || msg._id === undefined || chats?.length === 0) return;
+    sortChats(msg);
+    setInteraction(msg);
+  }, [msg])
+
+  useEffect(() => {
+    if (!interaction || interaction._id === undefined || chats?.length === 0) return
+    sortChats(interaction);
+  }, [interaction])
+
+  useEffect(() => {
+    setCurrentlyOpened(chatOpen === true ? chatID : null);
+    setChatID((prev) => chatOpen === false ? "" : prev);
+  }, [chatOpen])
 
   if (error) {
     return <FullContentError page={"Chats"} error={error} setError={setError} />
@@ -174,17 +193,23 @@ const ChatsContent = () => {
           <Suspense fallback={
             <CgSpinner size={25} className="m-auto mt-10 animate-spin" />
           }>
-            <ChatList chats={chats} setChatID={setChatID} setChatName={setChatName} setChatOpen={setChatOpen} chatID={chatID} interaction={interaction} />
+            <AvatarColorPallete />
+            <div className="flex-grow overflow-y-auto custom-scrollbar space-y-2">
+              {
+                chats.length > 0 && chats.map(chat => (
+                  <ChatListElement key={chat._id} chat={chat} setChatID={setChatID} setCurrentChat={setCurrentChat} setChatOpen={setChatOpen} chatID={chatID} />
+                ))
+              }
+            </div>
           </Suspense>
         </div>
       </div>
 
       {/* RIGHT COLUMN */}
-
       {/* 054 - May require to pass the full chat later on */}
       {
         chatID !== "" && chatOpen ?
-          <ChatInterface chatID={chatID} chatName={chatName} setChatOpen={setChatOpen} setInteraction={setInteraction} interaction={interaction} />
+          <ChatInterface chatID={chatID} currentChat={currentChat} setChatOpen={setChatOpen} interaction={interaction} setInteraction={setInteraction} />
           : <EmptyChatPlaceholder fallback={"onlyMessages"} />
       }
     </div>

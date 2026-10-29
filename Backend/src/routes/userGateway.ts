@@ -78,7 +78,7 @@ router.post(
     });
 
     //Assign Cookies for instant access after registration
-    await assignCookiesOnAuth(res, String(newUser._id), email, "register");
+    await assignCookiesOnAuth(req, res, String(newUser._id));
 
     //Send a welcome mail to new user after successfull registration.
     sendFinalMail(fullname, email, "register");
@@ -138,7 +138,7 @@ router.post(
     //Cross checking OTP verification using ACK Token
     otpCrossCheck(req, email);
 
-    await assignCookiesOnAuth(res, userID, email, "login");
+    await assignCookiesOnAuth(req, res, userID);
 
     //Remove the otp auth token
     res.clearCookie("otpAuth");

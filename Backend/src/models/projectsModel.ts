@@ -52,7 +52,7 @@ const projectSchema = new mongoose.Schema({
             }
         }],
         validate: {
-            validator: (tasks: { title: string, status: string, assignedTo: mongoose.Types.ObjectId }[]) => {
+            validator: (tasks: { title: string, status: string, assignedTo: mongoose.Types.ObjectId, department: string }[]) => {
                 if (tasks.length < 1) return false
                 const titles = tasks.map(task => task.title);
                 const uniqueTitles = new Set(titles);
@@ -83,7 +83,11 @@ const projectSchema = new mongoose.Schema({
             type: mongoose.Schema.Types.ObjectId,
             ref: 'users'
         }
-    }]
+    }],
+    chatRoom: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "chats"
+    }
 }, {
     timestamps: true,
     toJSON: { virtuals: true },

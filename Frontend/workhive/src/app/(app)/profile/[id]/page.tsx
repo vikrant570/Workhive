@@ -14,6 +14,7 @@ import {
 
 import { fetchUserProfile_server } from "@/lib/fetchData.server";
 import SocialActionButtonForProfileView from "../components/SocialActionButton";
+import FullContentError from "@/components/global_compns/FullContentError";
 
 // --- Mock Data ---
 const mockSocialLinks = [
@@ -45,7 +46,7 @@ export default async function AnotherUserProfile({ params }: params) {
 
     // Error Handle --
     if (!response.success || !response.profileData) {
-        return <div className="text-red-500/80 text-lg ml-150 mt-20 w-full font-semibold">Unable To Fetch Data At The Moment! <br /> Please Try Again Later.</div>
+        return <FullContentError page={"Profile"} error={response.message || "Failed to fetch data try again later!"} />
     }
 
     const profileData = response.profileData as anotherUserProfileView;

@@ -42,6 +42,11 @@ const userSocialSchema = new mongoose.Schema({
         ref: 'users'
       }
     ]
+  },
+  notifications: {
+    socials: Number,
+    messages: Number,
+    projects: Number
   }
 });
 

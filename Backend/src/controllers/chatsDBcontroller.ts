@@ -1,7 +1,9 @@
 import { Request, Response } from "express";
 import Chats from "../models/messaging/chatsModel.js";
 import Messages from "../models/messaging/messagesModel.js";
-import mongoose, { isValidObjectId } from "mongoose";
+import mongoose, { isValidObjectId, ObjectId } from "mongoose";
+import Users from "../models/auth/usersModel.js";
+import userSocials from "../models/userSocialsModel.js";
 
 //Get All Chats (List)
 export const getAllChats = async (req: Request, res: Response) => {
@@ -11,32 +13,30 @@ export const getAllChats = async (req: Request, res: Response) => {
   let myChats: Array<any> = [];
 
   // If requested for sending project invitation
-  const { projectSetup } = req.query;
+  const group = req.body?.group as { name: string, admin: string };
+
   const participants: Array<{ _id: string }> = req.body.participants;
 
-  if (projectSetup && projectSetup == "1" && participants.length > 0) {
+  if (isValidObjectId(group?.admin) && participants.length > 0) {
     const destructuredParticipants = participants.map(p => p._id);
 
     await Promise.all(
       destructuredParticipants.map(async (p) => {
         const chat = await Chats.aggregate([
-          {
-            $match: {
-              p2pKey: [String(userID), String(p)].sort().join("_")
-            }
-          },
+          { $match: { p2pKey: [String(userID), String(p)].sort().join("_") } },
           {
             $project: {
               participants: {
                 $filter: {
                   input: "$participants",
-                  as: "id",
-                  cond: { $ne: ["$$id", new mongoose.Types.ObjectId(userID)] }
+                  as: "p",
+                  cond: { $ne: ["$$p", new mongoose.Types.ObjectId(userID)] }
                 }
               }
             }
           }
         ]);
+
         if (!chat) {
           throw new Error("No Chat History Found !");
         } else {
@@ -49,15 +49,15 @@ export const getAllChats = async (req: Request, res: Response) => {
     if (myChats) return res.status(200).json({ success: true, myChats });
   };
 
-  //Requested For List Preview Of Chats
+  //Normal chat page req
   myChats = await Chats.find({ participants: userID }, { createdAt: 0 })
     .sort({
       updatedAt: -1,
     })
     .populate({
       path: "participants",
-      match: { _id: { $ne: userID } }, // Gives all the participants except the user
-      select: "fullname"               // populate only fullname
+      match: { _id: { $ne: userID } },
+      select: "fullname"
     })
     .populate({
       path: "lastMessage.sender",
@@ -69,18 +69,31 @@ export const getAllChats = async (req: Request, res: Response) => {
 }
 
 //CREATE NEW CHAT
-export const createNewChat = async (participants: string[], checked: boolean = false) => {
+export const createNewChat = async (participants: string[], checked: boolean = false, groupName?: string) => {
   const chatType = participants.length === 2 ? "p2p" : "group";
 
   if (!checked) {
-    const alreadyExists = await Chats.findOne({ participants: { $all: participants, $size: participants.length } }, { _id: 1 });
-    if (alreadyExists) throw new Error("Chat already exists!")
+    const query = chatType === "group" && groupName ?
+      { participants: { $all: participants, $size: participants.length }, "group.name": groupName }
+      : { participants: { $all: participants, $size: participants.length } }
+
+    const alreadyExists = await Chats.findOne(query);
+
+    if (alreadyExists) {
+      await alreadyExists.populate({
+        path: "participants",
+        select: "fullname"
+      })
+
+      return alreadyExists;
+    }
   }
 
   const newChat = await Chats.create({
     chatType,
     participants,
-    ...(chatType === "p2p" && { p2pKey: [String(participants[0]), String(participants[1])].sort().join("_") })
+    ...(chatType === "p2p" && { p2pKey: [String(participants[0]), String(participants[1])].sort().join("_") }),
+    ...(groupName && { group: { name: groupName, admin: participants[0] } })
   });
 
   if (!newChat) throw new Error("Failed to send message !");
@@ -115,34 +128,63 @@ export const deleteExistingChat = async (req: Request, res: Response) => {
   return res.status(401).json({ success: false, message: "Unauthorized!" });
 };
 
-// SEND MESSAGE TO ANYONE
-export const sendMessage = async (chatID: string, message: string, senderID: string) => {
+interface sentMessageInterface {
+  message: {
+    _id: mongoose.Types.ObjectId,
+    text: string,
+    senderID: mongoose.Types.ObjectId,
+    chatID: mongoose.Types.ObjectId
+  },
+  sender: {
+    name: string
+    for: string
+  }
+}
+
+export const sendMessage = async (type: "p2p" | "group", chatID: string, message: string, senderID: string): Promise<sentMessageInterface> => {
   // If its a project invite, the message field will contain a project's ObjectId
   const isProjectInvite = isValidObjectId(message);
   const projectID = isProjectInvite ? new mongoose.Types.ObjectId(message) : null;
 
-  const isBlocked = async (): Promise<boolean> => {
-    const chat = await Chats.findOne({ _id: chatID }, { participants: 1, blocked: 1 });
+  const findChat = async () => {
+    const query = type === "p2p" ? { p2pKey: [senderID, chatID].sort().join('_') } : { _id: chatID };
 
-    if (chat?.participants.length == 2 && chat.blocked == true) {
-      return true;
-    }
-
-    return false;
+    const chat = await Chats.findOne(query);
+    return chat || null;
   }
 
-  if (await isBlocked()) throw new Error("You can't send messages to this chat anymore!");
+  const chat = await findChat();
+
+  if (!chat || (type == "p2p" && chat.blocked)) throw new Error("You can't send messages to this chat anymore!");
 
   const sentMessage = await Messages.create({
-    chatID,
+    chatID: chat._id,
     senderID,
     text: (isProjectInvite ? "Project Invitation" : message),
     ...(isProjectInvite && { project: projectID }),
+    ...(isProjectInvite && { inviteStatus: "Pending" }),
     delivered: true
   });
 
   if (!sentMessage) throw new Error("Failed to send message!");
 
-  await Chats.findOneAndUpdate({ _id: chatID }, { lastMessage: { sender: senderID, text: sentMessage.text } });
-  return sentMessage;
+  chat.lastMessage = { sender: senderID, text: sentMessage.text };
+  chat.unread = chat.unread.map((u: any) => {
+    if (u.user.toString() !== senderID) {
+      u.count = true;
+    }
+    return u;
+  });
+  await chat.save();
+
+  chat.participants.forEach((p) => {
+    if (String(p) !== senderID) {
+      userSocials.findOneAndUpdate({ user: p }, { $inc: { "notifications.messages": 1 } })
+    }
+  })
+
+  const senderDetails = await Users.findOne({ _id: senderID }, { fullname: 1 });
+  const finalResponse = { message: sentMessage, sender: { name: senderDetails?.fullname || "Someone", for: type === "group" ? chat.group?.name : "" } }
+
+  return finalResponse;
 }

@@ -88,10 +88,10 @@ const SocialActionButtonForProfileView = ({ socialBooleans }: Props) => {
                 <div className="w-full flex flex-row items-center p-2 text-sm justify-between gap-2 rounded-2xl bg-ui-main border border-ui-tertiary/10">
 
                     <button className={`${blocked ? "cursor-not-allowed opacity-50" : "cursor-pointer"} flex items-center justify-center gap-2 px-4 py-2 transition-all duration-150 ease-in-out rounded-xl text-texts-primary
-                        ${isConnected && !remove ? "bg-transparent hover:scale-102 hover:bg-ui-tertiary/20 border border-ui-tertiary/20"
+                        ${isConnected && !remove ? "bg-transparent hover:bg-ui-tertiary/20 border border-ui-tertiary/20"
                             : (
-                                reqSent ? "bg-transparent hover:scale-102 hover:text-texts-important/80 hover:bg-texts-important/10 border border-texts-important/10"
-                                    : "bg-buttons hover:bg-buttons/60 hover:scale-102"
+                                reqSent ? "bg-transparent hover:text-texts-important/80 hover:bg-texts-important/10 border border-texts-important/10"
+                                    : "bg-buttons hover:bg-buttons/60"
                             )
                         } 
                         `}
@@ -107,7 +107,7 @@ const SocialActionButtonForProfileView = ({ socialBooleans }: Props) => {
                         }
                     </button>
 
-                    <button className={`flex items-center justify-center gap-2 px-4 py-2 text-texts-primary bg-transparent transition-all duration-150 cursor-pointer ease-in-out hover:scale-102 rounded-xl border
+                    <button className={`flex items-center justify-center gap-2 px-4 py-2 text-texts-primary bg-transparent transition-all duration-150 cursor-pointer ease-in-out rounded-xl border
                     ${!blocked ? "hover:text-red-500 hover:bg-alerts/10 border-alerts/50"
                             : "hover:bg-ui-tertiary/10 border-ui-tertiary/20"
                         }`}
@@ -119,7 +119,7 @@ const SocialActionButtonForProfileView = ({ socialBooleans }: Props) => {
             }
 
             <Link
-                href={`${!blocked ? `/chats?c_id=${userID}&from=/profile/${userID}}` : '#'}`}
+                href={`${!blocked ? `/chats?c_id=${userID}&from=/profile/${userID}` : '#'}`}
                 className={`w-full py-3 bg-ui-main border border-ui-tertiary/20 rounded-xl font-medium ${!blocked ? "hover:border-buttons/50 text-texts-primary" : "text-texts-secondary/70 cursor-not-allowed"} transition-all flex items-center justify-center gap-2`}
             >
                 <LuMessageSquare size={18} /> Message

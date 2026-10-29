@@ -9,7 +9,8 @@ const messageSchema = new mongoose.Schema({
     },
     senderID: {
         type: mongoose.Schema.Types.ObjectId,
-        ref: 'users'
+        ref: 'users',
+        required: true
     },
     text: {
         type: String,
@@ -26,7 +27,16 @@ const messageSchema = new mongoose.Schema({
     },
     inviteStatus: {
         type: String,
-        enum: ['Accepted', 'Rejected', 'Expired', 'Pending']
+        enum: ['Accepted', 'Rejected', 'Expired', 'Pending'],
+        required: function (this: any) {
+            return this.project !== undefined
+        },
+        default: undefined
+    },
+    reportStatus: {
+        type: String,
+        enum: ['Pending', 'Reported'],
+        default: undefined
     }
 }, { timestamps: true });
 

@@ -1,8 +1,8 @@
 import { cache } from 'react';
 import api from './axios';
 
-export const fetchSingleProject_client = cache(async (projectID: string) => {
-    const response = await api.get(`/projects/${projectID}`);
+export const fetchSingleProject_client = cache(async (projectID: string, requirement: "partial" | "full" = "partial") => {
+    const response = await api.get(`/projects/${projectID}?required=${requirement}`);
     if (!response.data.success) throw new Error("Failed to fetch project data!");
 
     return response.data

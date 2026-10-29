@@ -13,15 +13,18 @@ const commonErrors = (data: any) => {
 interface ProjectDataProps {
   projectID?: string;
   formData: ProjectFormData;
+  departments: Array<{ name: string, head: string }>
   selectedMembers: Array<{ _id: string }>;
   tasks: Task[];
   files: Pick<File, "name" | "size">[];
 }
 
-export const createNewProject = async ({ formData, selectedMembers, tasks, files }: ProjectDataProps) => {
+export const createNewProject = async (userID: string, { formData, departments, selectedMembers, tasks, files }: ProjectDataProps) => {
   if (!formData.title || !formData.deadline || selectedMembers.length === 0 || tasks.length === 0) {
     throw new Error("Please fill out all required fields!");
   }
+
+  const chatName = formData.groupName && formData.groupName.trim() !== "" ? formData.groupName : formData.title.trim().split(" ", 2).join(" ");
 
   const projectData = {
     title: formData.title.trim(),
@@ -29,26 +32,29 @@ export const createNewProject = async ({ formData, selectedMembers, tasks, files
     priority: formData.priority,
     tasks: tasks.map((t) => ({
       title: t.title.trim(),
-      assignedTo: t.assignedTo,
+      assignedTo: t.assignedTo._id,
+      ...(t.department?.trim() && { department: t.department?.trim() })
     })),
-    members: selectedMembers.map((m) => m._id),
-    attachments: files
+    ...(departments?.length > 0 && departments[0]?.name != "" && { departments: departments }),
+    attachments: files,
+    groupName: chatName.trim()
   }
 
   commonErrors(projectData);
+  console.log(projectData)
 
   //Calling api route to create project
-  const response = await api.post("/projects", projectData, { withCredentials: true });
+  const response = await api.put("/projects", projectData, { withCredentials: true });
   if (!response || !response.data.success) throw new Error("Server Isn't Responding! Try Later.");
 
-  const invite = await inviteMembers(selectedMembers, response.data.projectID);
+  const invite = await inviteMembers(selectedMembers, response.data.projectID, { name: chatName.trim(), admin: userID });
   if (!invite) alert("Project Was Created Successfully. But Failed To Send Invites!");
 
   return response;
 };
 
 
-export const editProject = async (originalData: Project, { projectID, formData, selectedMembers, tasks, files }: ProjectDataProps) => {
+export const editProject = async (originalData: Project, { projectID, formData, departments, selectedMembers, tasks, files }: ProjectDataProps) => {
   if (!projectID || projectID === "") throw new Error("Unable to process your request! Missing credentials.");
 
   if (formData.status === "Cancelled") {
@@ -119,10 +125,18 @@ export const editProject = async (originalData: Project, { projectID, formData, 
 export const askReport = async (assignedTo: string, taskTitle: string, projectTitle: string) => {
   return new Promise((resolve, reject) => {
     if (!socket) throw new Error("Unable To Connect To The Server! Try Again Later");
+    const text = `Asking progress report for [${taskTitle}[ ongoing under the project | ${projectTitle}.`;
 
-    socket.emit("askReport", assignedTo, taskTitle, projectTitle, (res: socketRes) => {
-      if (res.status === "ok") resolve(true);
-      else reject(new Error(res.message || "Failed to send report progress request!"));
+    socket.emit("sendMessage", "p2p", assignedTo, text, (response: socketRes) => {
+      if (response.status === "ok") resolve(true);
+      else reject(new Error("Failed to send report progress request!"));
     })
   })
+}
+
+export const acceptInvite = async (projectID: string, action: "Accepted" | "Rejected", inviteID: string) => {
+  const res = await api.patch(`/projects/invite-action/${projectID}`, { action: action, inviteID: inviteID }, { withCredentials: true })
+
+  if (!res || !res.data.success) throw new Error("Can't process your request currently, try again later!")
+  return res.data;
 }

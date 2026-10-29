@@ -6,36 +6,35 @@ export const proxy = async (req: NextRequest) => {
     const key = process.env.JWT_SECRET;
     const protectedRoutes = ['/home', '/projects', '/dashboard', '/socials', '/chats'];
 
+    const userAgent = req.headers.get('user-agent') || '';
+
+    const isMobile = /mobile|android|iphone|ipod/i.test(userAgent);
     const { pathname } = req.nextUrl;
+
+    if (isMobile && pathname !== '/smhome') {
+        return NextResponse.redirect(new URL('/smhome', req.url))
+    }
 
     const verifyAuthenticity = async () => {
         if (!refreshToken || !key) {
-            return false;
+            return { success: false, userID: "" };
         }
 
         try {
             const secret = new TextEncoder().encode(key);
             const { payload } = await jwtVerify(refreshToken, secret);
-            return true;
+            return { success: true, userID: payload?.userID };
         }
         catch (err) {
-            return false;
+            return { success: false, userID: "" };
         }
     }
 
-    const verified = await verifyAuthenticity();
+    const { success, userID } = await verifyAuthenticity();
 
     // User trying to visit the base route
-    if (pathname == '/') {
-        if (verified) {
-            return NextResponse.redirect(new URL('/home', req.url));
-        }
-        return NextResponse.next();
-    }
-
-    // Trying to visit auth even when logged in
-    if (pathname == '/auth') {
-        if (verified) {
+    if (pathname == '/' || pathname == '/auth') {
+        if (success) {
             return NextResponse.redirect(new URL('/home', req.url));
         }
         return NextResponse.next();
@@ -43,7 +42,13 @@ export const proxy = async (req: NextRequest) => {
 
     // User trying to visit any protected route
     if (protectedRoutes.some((route) => pathname.startsWith(route))) {
-        if (verified) {
+        if (success) {
+            //Projects Landing Page Can't be visited without the userID as a param, essential for UI
+            if (pathname == '/projects' && !req.nextUrl.searchParams.has('userID')) {
+                const urlClone = req.nextUrl.clone();
+                urlClone.searchParams.set('userID', String(userID));
+                return NextResponse.redirect(urlClone);
+            }
             return NextResponse.next();
         }
         return NextResponse.redirect(new URL('/auth', req.url))

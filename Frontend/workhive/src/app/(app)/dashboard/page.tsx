@@ -4,7 +4,7 @@ import {
 } from "react-icons/lu";
 import { CgSpinner } from "react-icons/cg";
 
-import ProjectPreview from "../projects/components/ProjectsList";
+import ProjectPreviewCard from "../projects/components/viewer/SmProjectsList";
 import { Suspense } from "react";
 
 // API Imports
@@ -33,7 +33,7 @@ export default async function DashBoard() {
             if (!data.success)
                 throw new Error("Failed To Fetch Data !")
 
-            return <ProjectPreview projects={data?.projects} />;
+            return <ProjectPreviewCard projects={data?.projects} />;
         } catch (error) {
             return <div className="text-alerts text-sm font-semibold">Unable To Fetch Data At The Moment! <br /> Please Try Again Later.</div>
         }
